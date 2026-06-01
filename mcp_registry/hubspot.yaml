@@ -1,0 +1,10 @@
+tool: hubspot
+mcp_server:
+  available: false
+  origin: null
+  maintained_by: null
+  url: null
+  install: null
+  tools_exposed: []
+fallback_if_unavailable: direct_api
+notes: "No vendor-maintained or mature community MCP server available at time of writing. The support orchestrator must generate its own minimal MCP server stub against HubSpot's REST API. Scope to the read paths the orchestrator needs: get_contact_by_email, get_subscription_status, get_recent_tickets. Write paths (notes, lifecycle stage updates) are out of scope for v1."

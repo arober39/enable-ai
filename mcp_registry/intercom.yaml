@@ -1,0 +1,9 @@
+tool: intercom
+mcp_server:
+  available: true
+  origin: official
+  maintained_by: Intercom
+  url: "https://github.com/intercom/mcp-server-intercom"
+  install: "npx @intercom/mcp-server"
+  tools_exposed: ["search_conversations", "get_conversation", "send_reply", "assign_to_agent"]
+fallback_if_unavailable: direct_api

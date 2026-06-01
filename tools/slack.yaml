@@ -1,0 +1,20 @@
+canonical_name: slack
+vendor: Slack (Salesforce)
+categories: [internal_messaging, internal_handoff, team_collaboration]
+native_ai_features:
+  - name: Slack AI
+    description: Channel summaries, thread recaps, and search answers grounded in the user's Slack workspace.
+    maturity: ga
+    coverage: medium
+  - name: Slack Workflow Builder
+    description: No-code automation builder; not AI-native but used as the trigger surface for custom AI workflows.
+    maturity: ga
+    coverage: high
+api_surface:
+  has_rest_api: true
+  has_webhooks: true
+  rate_limits: standard
+integration_patterns:
+  - orchestrate_into_unified_surface
+  - augment_with_custom_ai
+notes: "Slack's native AI is workspace-grounded only — it cannot reach into ticketing or CRM data. The right pattern for support handoff is to post structured handoff messages into Slack from a custom orchestrator that does have that cross-system view."

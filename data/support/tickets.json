@@ -1,0 +1,602 @@
+[
+  {
+    "id": "TKT-2026-0001",
+    "customer_id": "CUST-001",
+    "subject": "Can we still change the appetizer selection?",
+    "body": "Hi — we picked the autumn appetizer board back in October but Jordan and I are now leaning toward the cured-meats option. Are we past the deadline to switch?",
+    "status": "resolved",
+    "created_at": "2026-04-18T09:14:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-04-18T09:14:00Z", "text": "Hi — we picked the autumn appetizer board back in October but Jordan and I are now leaning toward the cured-meats option. Are we past the deadline to switch?"},
+      {"role": "agent", "timestamp": "2026-04-18T11:42:00Z", "text": "Hi Avery — you're well inside the window (the menu lock is 30 days out, July 12 is your wedding so you have until June 12). I've updated your booking to the cured-meats board. You'll see the change reflected in your planner tonight."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0002",
+    "customer_id": "CUST-005",
+    "subject": "What time does the venue allow access?",
+    "body": "When can we start setting up? Trying to plan when family flies in.",
+    "status": "resolved",
+    "created_at": "2026-04-19T16:30:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-04-19T16:30:00Z", "text": "When can we start setting up? Trying to plan when family flies in."},
+      {"role": "agent", "timestamp": "2026-04-19T17:05:00Z", "text": "Hi Adaeze — the venue opens for setup at 10am on July 19. Doors for guests at 4pm. You can find this in your planner under 'Day-of schedule.'"}
+    ]
+  },
+  {
+    "id": "TKT-2026-0003",
+    "customer_id": "CUST-014",
+    "subject": "How do I lock in a date once I decide?",
+    "body": "I'm leaning toward a wedding format in late September. What's the process to actually reserve a date?",
+    "status": "open",
+    "created_at": "2026-05-09T13:22:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-09T13:22:00Z", "text": "I'm leaning toward a wedding format in late September. What's the process to actually reserve a date?"}
+    ]
+  },
+  {
+    "id": "TKT-2026-0004",
+    "customer_id": "CUST-008",
+    "subject": "Vendor confirmation portal?",
+    "body": "Is there a place I can see which vendors have confirmed vs. are still pending?",
+    "status": "resolved",
+    "created_at": "2026-04-22T10:11:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-04-22T10:11:00Z", "text": "Is there a place I can see which vendors have confirmed vs. are still pending?"},
+      {"role": "agent", "timestamp": "2026-04-22T10:48:00Z", "text": "Yes — in your planner, go to Vendors → Status. Confirmed shows a green check; pending shows yellow. Right now you have 4 confirmed and 1 pending (the photographer, expected to confirm this week)."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0005",
+    "customer_id": "CUST-001",
+    "subject": "Welcome bags?",
+    "body": "Quick question — does our Signature package include welcome bags for out-of-town guests, or is that an add-on?",
+    "status": "resolved",
+    "created_at": "2026-04-24T08:55:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-04-24T08:55:00Z", "text": "Quick question — does our Signature package include welcome bags for out-of-town guests, or is that an add-on?"},
+      {"role": "agent", "timestamp": "2026-04-24T09:30:00Z", "text": "Signature includes welcome notes; welcome bags are an add-on ($18/guest, includes a curated assortment from local Hudson Valley producers). Want me to send the catalog?"}
+    ]
+  },
+  {
+    "id": "TKT-2026-0006",
+    "customer_id": "CUST-012",
+    "subject": "Can my parents see the RSVP list?",
+    "body": "My parents want to see who's confirmed. They don't have a Serenia login. Can I share a view?",
+    "status": "resolved",
+    "created_at": "2026-04-26T14:02:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-04-26T14:02:00Z", "text": "My parents want to see who's confirmed. They don't have a Serenia login. Can I share a view?"},
+      {"role": "agent", "timestamp": "2026-04-26T14:25:00Z", "text": "Yes — in your planner, RSVPs → Share, and you can generate a read-only link. It refreshes automatically. I just sent you a short how-to."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0007",
+    "customer_id": "CUST-017",
+    "subject": "Is parking included at the venue?",
+    "body": "The venue page mentions 'limited parking' — what does that mean exactly? My open-house guests will probably need it.",
+    "status": "pending_customer",
+    "created_at": "2026-04-28T11:00:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-04-28T11:00:00Z", "text": "The venue page mentions 'limited parking' — what does that mean exactly? My open-house guests will probably need it."},
+      {"role": "agent", "timestamp": "2026-04-28T13:14:00Z", "text": "Hi Kira — the venue has 22 on-site spots; overflow is a city lot two blocks south (free after 6pm). For 40 guests I'd recommend adding the valet service ($350 flat) or pre-sharing the overflow lot. Want me to send both options?"}
+    ]
+  },
+  {
+    "id": "TKT-2026-0008",
+    "customer_id": "CUST-019",
+    "subject": "Final headcount deadline?",
+    "body": "When do I need to lock in the final headcount?",
+    "status": "resolved",
+    "created_at": "2026-05-01T09:40:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-01T09:40:00Z", "text": "When do I need to lock in the final headcount?"},
+      {"role": "agent", "timestamp": "2026-05-01T10:08:00Z", "text": "Final headcount locks 14 days before — for your June 7 event that's May 24. You can edit freely until then; after, changes go through your event lead and may carry a per-guest catering charge."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0009",
+    "customer_id": "CUST-020",
+    "subject": "Will the bilingual MC be confirmed by end of June?",
+    "body": "We requested a bilingual MC (Spanish/English) back in March. Just want to confirm we'll have someone locked in well before October.",
+    "status": "open",
+    "created_at": "2026-05-08T15:18:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-08T15:18:00Z", "text": "We requested a bilingual MC (Spanish/English) back in March. Just want to confirm we'll have someone locked in well before October."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0010",
+    "customer_id": "CUST-002",
+    "subject": "Dietary preferences form",
+    "body": "Where do attendees submit their dietary preferences? I want to send the link out tomorrow.",
+    "status": "resolved",
+    "created_at": "2026-04-21T08:30:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-04-21T08:30:00Z", "text": "Where do attendees submit their dietary preferences? I want to send the link out tomorrow."},
+      {"role": "agent", "timestamp": "2026-04-21T09:02:00Z", "text": "Each RSVP confirmation email includes a dietary preferences field. For your offsite specifically, the form link is in your planner under Attendees → Forms. Karen (your VP) is also cc'd on that share."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0011",
+    "customer_id": "CUST-001",
+    "subject": "URGENT — florist just cancelled",
+    "body": "Our florist (Wildwood Floral) just emailed that they're closing the business. Our wedding is July 12. What now?? I'm in a panic.",
+    "status": "escalated",
+    "created_at": "2026-05-05T07:48:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-05T07:48:00Z", "text": "Our florist (Wildwood Floral) just emailed that they're closing the business. Our wedding is July 12. What now?? I'm in a panic."},
+      {"role": "agent", "timestamp": "2026-05-05T08:11:00Z", "text": "Avery — I see your message. I'm pulling in Reuben (our team lead) and looping vendor relations. We have a working list of three replacement florists in the Hudson Valley who can step in at this lead time. I'll have a shortlist with quotes to you by end of day. You're not alone in this — we'll fix it."},
+      {"role": "agent", "timestamp": "2026-05-05T16:22:00Z", "text": "Three options attached. Of these, Briar & Bloom is my recommendation — same price band, comparable style. Want me to set up a 15-min call with them this week?"}
+    ]
+  },
+  {
+    "id": "TKT-2026-0012",
+    "customer_id": "CUST-002",
+    "subject": "Need 4 ADA-accessible rooms added by Friday",
+    "body": "Our headcount changed — we now have 4 attendees who need ADA-accessible rooms. Friday hard deadline for our hotel partner. Can you make this happen?",
+    "status": "open",
+    "created_at": "2026-05-10T11:02:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-10T11:02:00Z", "text": "Our headcount changed — we now have 4 attendees who need ADA-accessible rooms. Friday hard deadline for our hotel partner. Can you make this happen?"}
+    ]
+  },
+  {
+    "id": "TKT-2026-0013",
+    "customer_id": "CUST-003",
+    "subject": "Need to move the event to Sausalito",
+    "body": "My mom's health has gotten worse and her doctor said no flying. We need to move the event from Mexico City to Sausalito (where she lives). I know this is a big ask 4 months out. Can you help?",
+    "status": "open",
+    "created_at": "2026-05-07T19:33:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-07T19:33:00Z", "text": "My mom's health has gotten worse and her doctor said no flying. We need to move the event from Mexico City to Sausalito (where she lives). I know this is a big ask 4 months out. Can you help?"},
+      {"role": "agent", "timestamp": "2026-05-07T20:15:00Z", "text": "Renata — first, I'm so sorry. We can absolutely help. I'm escalating this to your event lead (Aaliyah) and Margaux on vendor relations. We'll have a feasibility read for you by tomorrow afternoon, including which Mexico City deposits are recoverable and what Sausalito availability looks like for September 14."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0014",
+    "customer_id": "CUST-005",
+    "subject": "Add 4 kids, switch menu to halal",
+    "body": "My uncle Ikenna is now bringing his 4 grandchildren and would like the menu changed to halal. He says it's important. Can we do this?",
+    "status": "open",
+    "created_at": "2026-05-09T10:25:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-09T10:25:00Z", "text": "My uncle Ikenna is now bringing his 4 grandchildren and would like the menu changed to halal. He says it's important. Can we do this?"},
+      {"role": "agent", "timestamp": "2026-05-09T11:50:00Z", "text": "Hi Adaeze — yes on both. Adding 4 kids takes you to 39 (still within the venue's capacity and our caterer's prep). Switching the main menu to halal is feasible at this lead time; the caterer needs 21 days. You're inside that with room to spare. I'll confirm pricing impact today."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0015",
+    "customer_id": "CUST-007",
+    "subject": "Vegan and kosher options",
+    "body": "Two of our partners will need kosher meals and three are vegan. Standard request I assume, just confirming.",
+    "status": "resolved",
+    "created_at": "2026-04-25T14:00:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-04-25T14:00:00Z", "text": "Two of our partners will need kosher meals and three are vegan. Standard request I assume, just confirming."},
+      {"role": "agent", "timestamp": "2026-04-25T15:18:00Z", "text": "Yes — both standard. Our Big Sur caterer maintains a kosher-certified line and a fully vegan menu. I've flagged the count on the catering brief; nothing else needed from you on this."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0016",
+    "customer_id": "CUST-010",
+    "subject": "AV vendor flaked, kickoff is in 5 weeks",
+    "body": "Just got off the phone with the AV vendor — they're saying they can't deliver the stage lighting package they confirmed. Kickoff is June 4. This is on Serenia to fix.",
+    "status": "escalated",
+    "created_at": "2026-05-02T16:42:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-02T16:42:00Z", "text": "Just got off the phone with the AV vendor — they're saying they can't deliver the stage lighting package they confirmed. Kickoff is June 4. This is on Serenia to fix."},
+      {"role": "agent", "timestamp": "2026-05-02T17:30:00Z", "text": "Pradeep — escalating immediately. Reuben (team lead) is owning the resolution; I've got vendor relations sourcing replacements as of right now. I'll update you within 24 hours with a confirmed replacement vendor and any cost impact. If there is a cost delta we'll absorb it."},
+      {"role": "agent", "timestamp": "2026-05-03T15:08:00Z", "text": "Replacement vendor (LumenStage AV) confirmed for full package at same spec. No cost change. Their lead will reach out tomorrow for a walkthrough call."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0017",
+    "customer_id": "CUST-013",
+    "subject": "Hotel block is short by 6 rooms",
+    "body": "The hotel block we reserved is 6 rooms short of our actual headcount. What are our options?",
+    "status": "pending_customer",
+    "created_at": "2026-05-06T12:15:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-06T12:15:00Z", "text": "The hotel block we reserved is 6 rooms short of our actual headcount. What are our options?"},
+      {"role": "agent", "timestamp": "2026-05-06T13:40:00Z", "text": "Three options: (1) extend the existing block (hotel quoted +6 rooms at $189/night vs. your contracted $172 — they can't honor the block rate this close in), (2) overflow to the sister property 4 blocks away at $165/night, or (3) shuttle. Pricing breakdown attached. Want me to hold any of these?"}
+    ]
+  },
+  {
+    "id": "TKT-2026-0018",
+    "customer_id": "CUST-015",
+    "subject": "Caterer changed the menu without telling us",
+    "body": "Our caterer sent us the 'final' menu and three items are different from what we approved. Procurement is asking why we're paying for upgrades we didn't ask for.",
+    "status": "open",
+    "created_at": "2026-05-11T08:20:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-11T08:20:00Z", "text": "Our caterer sent us the 'final' menu and three items are different from what we approved. Procurement is asking why we're paying for upgrades we didn't ask for."},
+      {"role": "agent", "timestamp": "2026-05-11T09:55:00Z", "text": "Olivia — looking into this now. I have the approved menu on file and will reconcile against what they sent. If there are unauthorized changes we're not passing those costs to you. I'll have an answer by end of day."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0019",
+    "customer_id": "CUST-019",
+    "subject": "Photographer requesting deposit increase",
+    "body": "Our photographer is asking for an additional 15% deposit on top of what we already paid. Is that normal?",
+    "status": "pending_customer",
+    "created_at": "2026-05-04T15:10:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-04T15:10:00Z", "text": "Our photographer is asking for an additional 15% deposit on top of what we already paid. Is that normal?"},
+      {"role": "agent", "timestamp": "2026-05-04T16:35:00Z", "text": "Not normal — your contract locks the deposit at 30% with the balance due day-of. I'm reaching out to the vendor directly to clarify. You don't need to pay anything additional until we sort this out."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0020",
+    "customer_id": "CUST-020",
+    "subject": "Bilingual MC unavailable — need replacement",
+    "body": "Got a note that the MC we were considering booked another wedding that day. We still need a Spanish/English MC for October 4.",
+    "status": "open",
+    "created_at": "2026-05-10T18:02:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-10T18:02:00Z", "text": "Got a note that the MC we were considering booked another wedding that day. We still need a Spanish/English MC for October 4."},
+      {"role": "agent", "timestamp": "2026-05-11T09:14:00Z", "text": "Joaquin — vendor relations is on it. Three bilingual MC options in the Miami area; I'll have profiles and clips to you by Wednesday."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0021",
+    "customer_id": "CUST-009",
+    "subject": "Cancelling the wedding — what's the refund process?",
+    "body": "We've made the difficult decision to cancel. Please send instructions for the cancellation process and refund.",
+    "status": "resolved",
+    "created_at": "2026-03-17T09:30:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-03-17T09:30:00Z", "text": "We've made the difficult decision to cancel. Please send instructions for the cancellation process and refund."},
+      {"role": "agent", "timestamp": "2026-03-17T10:22:00Z", "text": "Henrik — I'm sorry. I'll walk you through it. Per the cancellation schedule in your contract, at 9 weeks out you're eligible for a 50% refund of paid amounts excluding the non-refundable deposit and committed vendor deposits. I've requested the full vendor recoverability picture; I'll have a specific dollar amount within 48 hours."},
+      {"role": "agent", "timestamp": "2026-03-19T14:05:00Z", "text": "Final refund amount: $14,820. Initiating now; should hit your card in 5-7 business days. If you have any questions about the breakdown the line items are attached."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0022",
+    "customer_id": "CUST-006",
+    "subject": "Kitchen was 90 minutes late — partial refund?",
+    "body": "Loved the event overall but the kitchen didn't start serving until 90 minutes after the scheduled time. We had guests leave. What's appropriate here?",
+    "status": "resolved",
+    "created_at": "2025-10-11T13:00:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2025-10-11T13:00:00Z", "text": "Loved the event overall but the kitchen didn't start serving until 90 minutes after the scheduled time. We had guests leave. What's appropriate here?"},
+      {"role": "agent", "timestamp": "2025-10-12T09:18:00Z", "text": "Mei Lin — that's a real failure on the caterer's side and I'm sorry it cost you. I've authorized a 20% credit on the catering line ($820). I'd also like to send you a small thank-you for your patience while we sort the vendor accountability. Watch for an email tomorrow."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0023",
+    "customer_id": "CUST-011",
+    "subject": "Double-charged for venue deposit",
+    "body": "I see two $1,200 charges on my card for the venue deposit. Should only be one.",
+    "status": "resolved",
+    "created_at": "2025-11-04T17:22:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2025-11-04T17:22:00Z", "text": "I see two $1,200 charges on my card for the venue deposit. Should only be one."},
+      {"role": "agent", "timestamp": "2025-11-04T18:01:00Z", "text": "Camille — confirmed the duplicate, I see it on our end too. Reversing the duplicate right now; should fall off your statement within 3 business days. Apologies for the scare."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0024",
+    "customer_id": "CUST-016",
+    "subject": "Final invoice doesn't match contract",
+    "body": "The final invoice is $640 higher than what we agreed to. Need a breakdown.",
+    "status": "resolved",
+    "created_at": "2025-09-12T11:14:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2025-09-12T11:14:00Z", "text": "The final invoice is $640 higher than what we agreed to. Need a breakdown."},
+      {"role": "agent", "timestamp": "2025-09-12T13:45:00Z", "text": "Rohan — pulled the line items. The $640 was an unrequested upcharge from the bar vendor (premium spirits substitution). Not in your contract. Removing it and reissuing the invoice now."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0025",
+    "customer_id": "CUST-001",
+    "subject": "Why is the deposit non-refundable?",
+    "body": "Quick policy question — what's the rationale for the deposit being non-refundable? Just want to understand before I tell my parents who are helping fund this.",
+    "status": "resolved",
+    "created_at": "2026-04-30T20:11:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-04-30T20:11:00Z", "text": "Quick policy question — what's the rationale for the deposit being non-refundable? Just want to understand before I tell my parents who are helping fund this."},
+      {"role": "agent", "timestamp": "2026-05-01T08:30:00Z", "text": "Hi Avery — the deposit covers the venue hold, your event lead's time, and the contracts we lock with vendors on your behalf in the first 90 days. It's non-refundable because we can't recover those costs if the event is cancelled. Happy to walk your parents through it if helpful."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0026",
+    "customer_id": "CUST-005",
+    "subject": "Pay the balance in two installments?",
+    "body": "Money is tight this month with the kids' school costs. Can we split the balance into two payments?",
+    "status": "pending_customer",
+    "created_at": "2026-05-08T22:14:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-08T22:14:00Z", "text": "Money is tight this month with the kids' school costs. Can we split the balance into two payments?"},
+      {"role": "agent", "timestamp": "2026-05-09T09:22:00Z", "text": "Adaeze — yes, we can offer a 2-payment plan (60% on June 14, 40% on July 5) at no additional cost. Reply 'confirm' and I'll set it up."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0027",
+    "customer_id": "CUST-017",
+    "subject": "Card on file declined",
+    "body": "Got an email saying my card on file was declined for the latest charge. I think it's because it's a new card. How do I update?",
+    "status": "resolved",
+    "created_at": "2026-05-03T11:00:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-03T11:00:00Z", "text": "Got an email saying my card on file was declined for the latest charge. I think it's because it's a new card. How do I update?"},
+      {"role": "agent", "timestamp": "2026-05-03T11:12:00Z", "text": "Kira — in your account, go to Billing → Payment methods, and you can replace the card there. Once updated the failed charge will auto-retry within 24 hours."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0028",
+    "customer_id": "CUST-008",
+    "subject": "Need an itemized receipt for accounting",
+    "body": "My accountant needs an itemized receipt for our last payment. The summary one isn't enough.",
+    "status": "resolved",
+    "created_at": "2026-04-29T14:50:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-04-29T14:50:00Z", "text": "My accountant needs an itemized receipt for our last payment. The summary one isn't enough."},
+      {"role": "agent", "timestamp": "2026-04-29T15:18:00Z", "text": "Sent — the itemized PDF should be in your inbox now. If your accountant needs anything more specific (tax codes, vendor breakdown), let me know."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0029",
+    "customer_id": "CUST-002",
+    "subject": "Procurement needs an updated W-9",
+    "body": "Our procurement team is asking for an updated W-9 on Serenia's letterhead. Can you send?",
+    "status": "resolved",
+    "created_at": "2026-04-20T10:40:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-04-20T10:40:00Z", "text": "Our procurement team is asking for an updated W-9 on Serenia's letterhead. Can you send?"},
+      {"role": "agent", "timestamp": "2026-04-20T11:05:00Z", "text": "Devon — attached. Let me know if procurement needs anything else (we have a vendor packet with W-9, COI, and our standard MSA template if useful)."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0030",
+    "customer_id": "CUST-013",
+    "subject": "PO# missing from last invoice",
+    "body": "The PO# wasn't on the invoice you sent. Our AP team can't process without it. Can you reissue?",
+    "status": "resolved",
+    "created_at": "2026-05-01T13:30:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-01T13:30:00Z", "text": "The PO# wasn't on the invoice you sent. Our AP team can't process without it. Can you reissue?"},
+      {"role": "agent", "timestamp": "2026-05-01T14:02:00Z", "text": "Beatriz — reissued with PO# on the header. Should be in your inbox."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0031",
+    "customer_id": "CUST-001",
+    "subject": "Add 12 guests at T-6 days?",
+    "body": "Realistic question: if my brother's whole family RSVPs late (12 people), can you accommodate? We'd be 6 days out from the wedding.",
+    "status": "open",
+    "created_at": "2026-05-10T19:48:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-10T19:48:00Z", "text": "Realistic question: if my brother's whole family RSVPs late (12 people), can you accommodate? We'd be 6 days out from the wedding."},
+      {"role": "agent", "timestamp": "2026-05-11T08:40:00Z", "text": "Avery — honest answer: 12 at T-6 days is hard. Venue capacity is fine (you'd be at 122/150). The constraint is catering — our partner needs 7 days for additions above 5 guests. I can ask if they'll make an exception for 12; the per-guest cost will jump and it's not guaranteed. Let me check tomorrow and come back with an answer."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0032",
+    "customer_id": "CUST-004",
+    "subject": "Same as last year, but 25% bigger",
+    "body": "Hey team — for our July customer appreciation party, run the same playbook as 2025 but scale to ~75 guests (we were ~60 last year). Same venue if available, same vendors if they'll have us. Sound good?",
+    "status": "open",
+    "created_at": "2026-05-07T11:18:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-07T11:18:00Z", "text": "Hey team — for our July customer appreciation party, run the same playbook as 2025 but scale to ~75 guests (we were ~60 last year). Same venue if available, same vendors if they'll have us. Sound good?"},
+      {"role": "agent", "timestamp": "2026-05-07T12:30:00Z", "text": "Owen — love it. Pinged the 2025 venue and our caterer; both available. Photographer is double-booked for July so I'll source two alternates in their style. Draft brief by Friday."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0033",
+    "customer_id": "CUST-007",
+    "subject": "Add a closing dinner Saturday night",
+    "body": "Partners would like to add a closing dinner on Saturday (post-retreat). 45 people, casual. Can we tack that on?",
+    "status": "resolved",
+    "created_at": "2026-04-27T17:22:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-04-27T17:22:00Z", "text": "Partners would like to add a closing dinner on Saturday (post-retreat). 45 people, casual. Can we tack that on?"},
+      {"role": "agent", "timestamp": "2026-04-28T09:50:00Z", "text": "Theodore — yes. Three options near the retreat venue, all available August 22. Sent over with pricing and menus."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0034",
+    "customer_id": "CUST-010",
+    "subject": "Push kickoff back one week?",
+    "body": "Our board offsite got rescheduled and now overlaps with sales kickoff. Can we push kickoff from June 4 to June 11?",
+    "status": "escalated",
+    "created_at": "2026-05-08T20:00:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-08T20:00:00Z", "text": "Our board offsite got rescheduled and now overlaps with sales kickoff. Can we push kickoff from June 4 to June 11?"},
+      {"role": "agent", "timestamp": "2026-05-09T08:15:00Z", "text": "Pradeep — looping Reuben on this. Major date change at T-4 weeks is a big lift; we'll need vendor-by-vendor confirms. I'll have a feasibility readout by Friday including any vendor change fees."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0035",
+    "customer_id": "CUST-012",
+    "subject": "Switch venue from Atlanta to Houston?",
+    "body": "Houston works better for travel for most of the family. Can we still switch with 4+ months notice?",
+    "status": "open",
+    "created_at": "2026-05-06T09:14:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-06T09:14:00Z", "text": "Houston works better for travel for most of the family. Can we still switch with 4+ months notice?"},
+      {"role": "agent", "timestamp": "2026-05-06T11:00:00Z", "text": "Yusuf — yes, that lead time gives us room. Atlanta venue deposit is recoverable up to 90 days out (so until late June for your Sept 28 date). I'll send Houston venue options matching your guest count and bilingual needs by Friday."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0036",
+    "customer_id": "CUST-015",
+    "subject": "Add a 200-person mixer the night before",
+    "body": "Marketing wants a customer mixer the evening before kickoff. ~200 people, drinks + light bites. Doable?",
+    "status": "open",
+    "created_at": "2026-05-09T16:00:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-09T16:00:00Z", "text": "Marketing wants a customer mixer the evening before kickoff. ~200 people, drinks + light bites. Doable?"},
+      {"role": "agent", "timestamp": "2026-05-10T08:20:00Z", "text": "Olivia — yes. Park City has three venues that can host 200 on June 17; sending profiles. Catering through your existing caterer is feasible at this scale. Quote turnaround Tuesday."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0037",
+    "customer_id": "CUST-018",
+    "subject": "Add-on turnaround during planning?",
+    "body": "If we sign, what's the typical turnaround when we ask for an add-on (like an extra workshop track or a closing dinner)?",
+    "status": "resolved",
+    "created_at": "2026-05-02T10:30:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-02T10:30:00Z", "text": "If we sign, what's the typical turnaround when we ask for an add-on (like an extra workshop track or a closing dinner)?"},
+      {"role": "agent", "timestamp": "2026-05-02T11:45:00Z", "text": "Maxwell — for add-ons in the planning phase (more than 30 days out), our event leads typically come back with 2-3 sourced options within 3 business days. Inside 30 days it's more variable — depends on vendor availability."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0038",
+    "customer_id": "CUST-019",
+    "subject": "Change dinner from sit-down to cocktail-style",
+    "body": "We're rethinking the dinner format — cocktail-style feels more 'us.' Can we switch?",
+    "status": "pending_customer",
+    "created_at": "2026-05-05T19:00:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-05T19:00:00Z", "text": "We're rethinking the dinner format — cocktail-style feels more 'us.' Can we switch?"},
+      {"role": "agent", "timestamp": "2026-05-06T09:30:00Z", "text": "Esme — yes, you're still inside the menu-lock window. Cocktail-style is actually slightly cheaper at your headcount. I've sent over a draft cocktail menu and the cost delta for review."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0039",
+    "customer_id": "CUST-002",
+    "subject": "Add a half-day engineering workshop track",
+    "body": "Engineering leadership wants a half-day technical workshop track on day 2. ~25 people split into 3 rooms. Can you scope?",
+    "status": "open",
+    "created_at": "2026-05-11T14:10:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-11T14:10:00Z", "text": "Engineering leadership wants a half-day technical workshop track on day 2. ~25 people split into 3 rooms. Can you scope?"},
+      {"role": "agent", "timestamp": "2026-05-11T15:33:00Z", "text": "Devon — Sonoma venue has 3 breakout rooms we can use. Scoping AV needs (3 displays, mics, recording if you want it) and back-of-house support. Cost estimate by Wednesday."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0040",
+    "customer_id": "CUST-020",
+    "subject": "Move dance floor to outdoor patio",
+    "body": "We toured the venue this weekend and the outdoor patio is gorgeous. Can we move the dance floor outside (weather permitting)?",
+    "status": "resolved",
+    "created_at": "2026-04-26T18:40:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-04-26T18:40:00Z", "text": "We toured the venue this weekend and the outdoor patio is gorgeous. Can we move the dance floor outside (weather permitting)?"},
+      {"role": "agent", "timestamp": "2026-04-27T09:05:00Z", "text": "Joaquin — yes. Patio supports the layout; we'd add a small weather-backup plan (a 30-minute call to move it indoors if needed). Floor rental cost is identical. I've updated the layout in your planner."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0041",
+    "customer_id": "CUST-002",
+    "subject": "Need SOC 2 attestation",
+    "body": "Our security team is asking for Serenia's SOC 2 Type II attestation. Can you share?",
+    "status": "escalated",
+    "created_at": "2026-04-23T09:50:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-04-23T09:50:00Z", "text": "Our security team is asking for Serenia's SOC 2 Type II attestation. Can you share?"},
+      {"role": "agent", "timestamp": "2026-04-23T10:30:00Z", "text": "Devon — routing this to our trust team. They'll send the attestation via a secure share within 1 business day. If your security team needs to schedule a Q&A, happy to set that up."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0042",
+    "customer_id": "CUST-007",
+    "subject": "Confidentiality breach concern with vendor contract",
+    "body": "Our procurement contact says the venue's vendor accidentally sent an unredacted draft of our retreat agenda to opposing counsel in an unrelated matter. We need to understand the chain of custody and what controls are in place. This is serious.",
+    "status": "escalated",
+    "created_at": "2026-05-04T08:20:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-04T08:20:00Z", "text": "Our procurement contact says the venue's vendor accidentally sent an unredacted draft of our retreat agenda to opposing counsel in an unrelated matter. We need to understand the chain of custody and what controls are in place. This is serious."},
+      {"role": "agent", "timestamp": "2026-05-04T09:00:00Z", "text": "Theodore — I hear you. This is escalated to Annika (our GC) and Reuben (team lead). We are pausing all vendor-facing comms on your booking until we understand the breach. You will hear from Annika directly today with our preliminary findings and remediation steps."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0043",
+    "customer_id": "CUST-015",
+    "subject": "Need MSA for procurement review",
+    "body": "Our procurement is reviewing all enterprise vendor relationships. They need a Master Services Agreement signed before we can book the next event. Standard request.",
+    "status": "escalated",
+    "created_at": "2026-04-29T13:00:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-04-29T13:00:00Z", "text": "Our procurement is reviewing all enterprise vendor relationships. They need a Master Services Agreement signed before we can book the next event. Standard request."},
+      {"role": "agent", "timestamp": "2026-04-29T14:20:00Z", "text": "Olivia — looping Devon Pritchard (our contracts associate). He'll send our standard MSA template within 2 business days. If your procurement team has redlines we can typically turn those in under a week."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0044",
+    "customer_id": "CUST-018",
+    "subject": "Reference call with another biotech?",
+    "body": "We'd love a reference call with another biotech that's run a 200-person retreat with Serenia in the last 18 months. Possible?",
+    "status": "escalated",
+    "created_at": "2026-05-05T10:00:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-05T10:00:00Z", "text": "We'd love a reference call with another biotech that's run a 200-person retreat with Serenia in the last 18 months. Possible?"},
+      {"role": "agent", "timestamp": "2026-05-05T11:20:00Z", "text": "Maxwell — yes. Routing to Yuki on the sales side; she'll coordinate a reference call with a customer who's a strong fit. Expect outreach this week."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0045",
+    "customer_id": "CUST-013",
+    "subject": "Background check process for on-site staff",
+    "body": "Our HR team wants to understand the background check process for any Serenia staff on-site during our offsite. What's the policy?",
+    "status": "escalated",
+    "created_at": "2026-05-02T14:30:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-02T14:30:00Z", "text": "Our HR team wants to understand the background check process for any Serenia staff on-site during our offsite. What's the policy?"},
+      {"role": "agent", "timestamp": "2026-05-02T15:50:00Z", "text": "Beatriz — pulling Jordan (our Head of People) into this. We can share our standard background check policy (Sterling 7-year criminal + ID verify for any on-site staff) and an attestation if your HR needs one for the file."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0046",
+    "customer_id": "CUST-010",
+    "subject": "Will switch vendors if AV isn't resolved by Friday",
+    "body": "Following up on the AV mess. If we don't have a confirmed replacement by EOD Friday I'm taking this to my VP and we'll look at moving the kickoff to a different platform entirely.",
+    "status": "escalated",
+    "created_at": "2026-05-06T17:18:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-06T17:18:00Z", "text": "Following up on the AV mess. If we don't have a confirmed replacement by EOD Friday I'm taking this to my VP and we'll look at moving the kickoff to a different platform entirely."},
+      {"role": "agent", "timestamp": "2026-05-06T18:00:00Z", "text": "Pradeep — understood. We already have LumenStage AV confirmed (sent earlier in the related ticket TKT-2026-0016). Walkthrough call is on the books for tomorrow. You won't miss your June 4 date. Let me know if you want to loop your VP into the walkthrough so they hear it firsthand."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0047",
+    "customer_id": "CUST-009",
+    "subject": "Disputing cancellation fee with my card company",
+    "body": "Sending you notice — I'm disputing the cancellation fee with my credit card company. The deposit was higher than what other vendors charged and I don't agree with the policy.",
+    "status": "escalated",
+    "created_at": "2026-04-08T20:11:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-04-08T20:11:00Z", "text": "Sending you notice — I'm disputing the cancellation fee with my credit card company. The deposit was higher than what other vendors charged and I don't agree with the policy."},
+      {"role": "agent", "timestamp": "2026-04-09T09:30:00Z", "text": "Henrik — acknowledged. Looping Annika (GC) and Wendell (VP Finance). We'll respond to the chargeback with the signed contract and the line-item breakdown of recoverable vs. non-recoverable vendor costs. We'd also welcome a 15-minute call if you want to work through it directly before the chargeback resolves."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0048",
+    "customer_id": "CUST-003",
+    "subject": "Considering pulling the booking entirely",
+    "body": "Mom isn't improving. Even Sausalito feels too much. I'm considering cancelling the whole thing. Please tell me what my options are — I don't want to make a decision I regret.",
+    "status": "escalated",
+    "created_at": "2026-05-11T22:18:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-11T22:18:00Z", "text": "Mom isn't improving. Even Sausalito feels too much. I'm considering cancelling the whole thing. Please tell me what my options are — I don't want to make a decision I regret."},
+      {"role": "agent", "timestamp": "2026-05-12T07:42:00Z", "text": "Renata — I'm so sorry. Three paths to consider, no pressure: (1) pause and revisit in 30 days while we hold your deposits, (2) move forward with a much smaller, low-key version (10-15 people, at her house if helpful), or (3) cancel and we'll work to recover what we can. Naomi (our Director of Support) wants to be on a call with you when you're ready. No clock from our side."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0049",
+    "customer_id": "CUST-014",
+    "subject": "Want to talk to a senior planner before signing",
+    "body": "Before I commit, I'd like to talk with a senior event lead — someone who's run weddings of the size I'm considering. Possible?",
+    "status": "pending_customer",
+    "created_at": "2026-05-09T15:40:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-09T15:40:00Z", "text": "Before I commit, I'd like to talk with a senior event lead — someone who's run weddings of the size I'm considering. Possible?"},
+      {"role": "agent", "timestamp": "2026-05-10T09:00:00Z", "text": "Lin — absolutely. Aaliyah (one of our senior leads) has openings Tuesday and Thursday this week. 30 minutes. Calendar link attached — pick what works."}
+    ]
+  },
+  {
+    "id": "TKT-2026-0050",
+    "customer_id": "CUST-005",
+    "subject": "Family disagreement on venue change",
+    "body": "Mom wants to move the reunion to Houston, Uncle Ikenna wants to keep it in Atlanta. They're both calling me. Can you mediate or at least give us a framework to decide?",
+    "status": "escalated",
+    "created_at": "2026-05-10T21:14:00Z",
+    "conversation_history": [
+      {"role": "customer", "timestamp": "2026-05-10T21:14:00Z", "text": "Mom wants to move the reunion to Houston, Uncle Ikenna wants to keep it in Atlanta. They're both calling me. Can you mediate or at least give us a framework to decide?"},
+      {"role": "agent", "timestamp": "2026-05-11T08:00:00Z", "text": "Adaeze — happy to help. I can host a short joint call with you, your mom, and Ikenna where we walk through the cost, logistics, and timing tradeoffs side-by-side. No advocacy from us — just the facts so the family can decide. Want me to send a poll for times?"}
+    ]
+  }
+]

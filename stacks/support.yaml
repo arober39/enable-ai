@@ -1,0 +1,15 @@
+department: support
+declared_at: 2026-01-15
+tools:
+  - name: intercom
+    primary_use: ticketing
+    description: Inbound customer messages, conversation threading, agent assignment
+  - name: zendesk
+    primary_use: knowledge_base
+    description: Articles, FAQs, internal documentation searchable by agents
+  - name: slack
+    primary_use: internal_handoff
+    description: Escalation channel for complex tickets; internal team coordination
+  - name: hubspot
+    primary_use: crm
+    description: Customer profile, account history, subscription status

@@ -1,0 +1,44 @@
+# AI Config manifest consumed by scripts/setup_ai_configs.py.
+# Pinned for the multi-signal guardrails tutorial — do not change the config
+# name, variation names, model, or mode without updating the tutorial.
+
+ai_config:
+  name: support-orchestrator-config
+  mode: completion
+  description: |
+    Runtime configuration for Serenia & Co.'s customer support orchestrator.
+    The v1-baseline variation is the working prompt; v2-detailed-responses
+    is the prompt designed to demonstrate the hallucination regression the
+    multi-signal guardrails tutorial catches.
+
+  variations:
+    - name: v1-baseline
+      is_default: true
+      model: claude-sonnet-4-7
+      max_tokens: 1024
+      temperature: 0.3
+      messages_file: prompts/v1_baseline.md
+
+    - name: v2-detailed-responses
+      is_default: false
+      model: claude-sonnet-4-7
+      max_tokens: 1024
+      temperature: 0.3
+      messages_file: prompts/v2_detailed_responses.md
+
+  initial_traffic:
+    v1-baseline: 100
+    v2-detailed-responses: 0
+
+judges:
+  - name: factual_accuracy
+    prompt_file: judges/factual_accuracy.md
+    description: |
+      Grades responses on factual accuracy against Serenia's policy
+      documentation. Attached in the LaunchDarkly UI; LaunchDarkly
+      auto-generates the support.judge.factual_accuracy metric.
+
+metrics_referenced:
+  - support.errors.count
+  - support.escalation_rate
+  - support.judge.factual_accuracy

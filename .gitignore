@@ -1,0 +1,43 @@
+# Environments
+.env
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+
+# Test / type / lint caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Agent state and scratchpads
+agent-state/*
+!agent-state/.gitkeep
+*.scratchpad.md
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# UI — Node.js / Next.js / Playwright artifacts
+ui/web/node_modules/
+ui/web/.next/
+ui/web/out/
+ui/web/test-results/
+ui/web/playwright-report/
+ui/web/playwright/.cache/

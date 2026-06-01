@@ -1,0 +1,15 @@
+tool: zendesk
+mcp_server:
+  available: true
+  origin: community
+  maintained_by: "third-party (community)"
+  url: "https://github.com/community/mcp-server-zendesk"
+  install: "npx mcp-server-zendesk"
+  tools_exposed:
+    - "search_articles"
+    - "get_article"
+    - "search_tickets"
+    - "get_ticket"
+    - "create_internal_note"
+fallback_if_unavailable: direct_api
+notes: "No vendor-maintained MCP server at time of writing. Community implementation covers the read-paths the support orchestrator needs; write-paths (creating tickets) require the direct REST API."

@@ -1,0 +1,15 @@
+tool: slack
+mcp_server:
+  available: true
+  origin: reference
+  maintained_by: "Anthropic / modelcontextprotocol reference servers"
+  url: "https://github.com/modelcontextprotocol/servers/tree/main/src/slack"
+  install: "npx @modelcontextprotocol/server-slack"
+  tools_exposed:
+    - "post_message"
+    - "list_channels"
+    - "get_channel_history"
+    - "add_reaction"
+    - "get_thread_replies"
+fallback_if_unavailable: direct_api
+notes: "Reference MCP server published in the modelcontextprotocol/servers repo. Sufficient for the support handoff pattern (post structured handoff messages, read thread replies for the human escalation result)."

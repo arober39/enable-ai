@@ -1,0 +1,28 @@
+canonical_name: zendesk
+vendor: Zendesk
+categories: [knowledge_base, ticketing, customer_support]
+native_ai_features:
+  - name: Zendesk AI Agents (formerly Ultimate)
+    description: AI-driven autonomous resolution for tier-1 inquiries against the connected knowledge base.
+    maturity: ga
+    coverage: medium
+  - name: Generative replies
+    description: Suggested article-grounded replies for human agents in the Zendesk agent workspace.
+    maturity: ga
+    coverage: high
+  - name: Intelligent triage
+    description: Auto-classification of tickets by intent, sentiment, and language; routes to the right team.
+    maturity: ga
+    coverage: medium
+  - name: Article generation assist
+    description: AI drafting tools for new help center articles based on resolved tickets.
+    maturity: ga
+    coverage: low
+api_surface:
+  has_rest_api: true
+  has_webhooks: true
+  rate_limits: standard
+integration_patterns:
+  - use_native_ai
+  - augment_with_custom_ai
+notes: "Zendesk's native AI is competent for knowledge-base-driven answers but does not natively combine CRM signals from outside systems. The knowledge base itself is a strong asset to expose via a custom orchestrator's retrieval tool."
