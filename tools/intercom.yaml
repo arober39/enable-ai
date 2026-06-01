@@ -1,0 +1,24 @@
+canonical_name: intercom
+vendor: Intercom
+categories: [ticketing, customer_messaging, customer_support]
+native_ai_features:
+  - name: Fin
+    description: AI agent for first-response drafting and resolution suggestions; can resolve common questions end-to-end against the customer's connected help content.
+    maturity: ga
+    coverage: medium
+  - name: AI Compose
+    description: In-line reply suggestions for human agents based on conversation context and past resolutions.
+    maturity: ga
+    coverage: high
+  - name: Conversation summarization
+    description: Auto-generated summaries of long conversation threads at handoff time.
+    maturity: ga
+    coverage: high
+api_surface:
+  has_rest_api: true
+  has_webhooks: true
+  rate_limits: standard
+integration_patterns:
+  - augment_with_custom_ai
+  - orchestrate_into_unified_surface
+notes: "Strong native AI but limited to Intercom's own model and surface. Custom orchestration on top adds flexibility — e.g. routing decisions that consider CRM context Fin doesn't see."

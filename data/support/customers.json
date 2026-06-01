@@ -1,0 +1,182 @@
+[
+  {
+    "id": "CUST-001",
+    "name": "Avery Patel",
+    "email": "avery.patel@gmail.com",
+    "plan": "signature",
+    "subscription_status": "active",
+    "signup_date": "2025-08-04",
+    "notes": "Co-host: Jordan Patel. 110-person wedding scheduled 2026-07-12 (Hudson Valley, NY)."
+  },
+  {
+    "id": "CUST-002",
+    "name": "Devon Reyes",
+    "email": "devon.reyes@novapath.health",
+    "plan": "enterprise",
+    "subscription_status": "active",
+    "signup_date": "2026-01-08",
+    "notes": "NovaPath Health offsite coordinator. 60-person company offsite, 2026-07-08 (Sonoma). VP People (Karen Ostrowski) cc'd on all threads."
+  },
+  {
+    "id": "CUST-003",
+    "name": "Renata Aguilar-Pham",
+    "email": "renata.aguilar@protonmail.com",
+    "plan": "signature",
+    "subscription_status": "active",
+    "signup_date": "2026-01-22",
+    "notes": "60th birthday for her mother. 50-person event scheduled 2026-09-14, originally Mexico City — currently exploring relocation to Sausalito for accessibility."
+  },
+  {
+    "id": "CUST-004",
+    "name": "Owen Bridgewater",
+    "email": "owen@bridgewaterclimbing.com",
+    "plan": "signature",
+    "subscription_status": "active",
+    "signup_date": "2023-04-15",
+    "notes": "Repeat customer (3 years). Two events/year: annual customer appreciation party (July), staff holiday party (December). Strong preference for repeat vendors."
+  },
+  {
+    "id": "CUST-005",
+    "name": "Adaeze Okonkwo",
+    "email": "adaeze.okonkwo@gmail.com",
+    "plan": "essentials",
+    "subscription_status": "active",
+    "signup_date": "2026-03-09",
+    "notes": "Family reunion, 35 people, 2026-07-19. Multiple decision-makers in family — primary contact is Adaeze but mother (Ngozi) and uncle (Ikenna) frequently weigh in."
+  },
+  {
+    "id": "CUST-006",
+    "name": "Mei Lin Vasquez",
+    "email": "meilin.vasquez@gmail.com",
+    "plan": "signature",
+    "subscription_status": "completed",
+    "signup_date": "2024-11-02",
+    "notes": "Hosted 40th birthday celebration (60 guests) in October 2025. Resolved positive. Soft signal: may rebook for a 5-year anniversary milestone in 2027."
+  },
+  {
+    "id": "CUST-007",
+    "name": "Theodore Kapoor",
+    "email": "t.kapoor@kapoorlegalgroup.com",
+    "plan": "enterprise",
+    "subscription_status": "active",
+    "signup_date": "2026-02-14",
+    "notes": "Kapoor Legal Group — annual partner retreat, 45 attendees, 2026-08-22 (Big Sur). High touch; requires SOC 2 attestation."
+  },
+  {
+    "id": "CUST-008",
+    "name": "Sofia Bremer",
+    "email": "sofia@bremerstudio.com",
+    "plan": "essentials",
+    "subscription_status": "active",
+    "signup_date": "2026-04-01",
+    "notes": "Bremer Studio (small design agency). 25-person studio anniversary, 2026-06-21."
+  },
+  {
+    "id": "CUST-009",
+    "name": "Henrik Andersen-Lopez",
+    "email": "henrik.al@gmail.com",
+    "plan": "signature",
+    "subscription_status": "cancelled",
+    "signup_date": "2025-09-12",
+    "notes": "Wedding originally planned for 2026-05-23. Cancelled 2026-03-18 — refund dispute resolved via Tier-2 escalation."
+  },
+  {
+    "id": "CUST-010",
+    "name": "Pradeep Mukherjee",
+    "email": "pradeep.mukherjee@gridworks.io",
+    "plan": "enterprise",
+    "subscription_status": "active",
+    "signup_date": "2026-01-30",
+    "notes": "GridWorks (Series B startup). Sales kickoff, 80 attendees, 2026-06-04 (Austin)."
+  },
+  {
+    "id": "CUST-011",
+    "name": "Camille Boucher",
+    "email": "camille.boucher@gmail.com",
+    "plan": "essentials",
+    "subscription_status": "completed",
+    "signup_date": "2025-10-08",
+    "notes": "Engagement party, 30 guests, held 2025-12-13. Closed without issues."
+  },
+  {
+    "id": "CUST-012",
+    "name": "Yusuf Adekunle",
+    "email": "yusuf.adekunle@adekunlefamily.com",
+    "plan": "essentials",
+    "subscription_status": "active",
+    "signup_date": "2026-03-21",
+    "notes": "60th wedding anniversary for parents. 45 guests, 2026-09-28 (Atlanta). Bilingual event needs (English/Yoruba)."
+  },
+  {
+    "id": "CUST-013",
+    "name": "Beatriz Salazar",
+    "email": "beatriz.salazar@cooperhealthcare.com",
+    "plan": "enterprise",
+    "subscription_status": "active",
+    "signup_date": "2026-02-26",
+    "notes": "Cooper Healthcare. Leadership offsite, 35 attendees, 2026-07-30 (Asheville)."
+  },
+  {
+    "id": "CUST-014",
+    "name": "Lin Wei-Han",
+    "email": "linweihan@gmail.com",
+    "plan": "signature",
+    "subscription_status": "prospect",
+    "signup_date": "2026-05-02",
+    "notes": "Signed up 10 days ago. Currently choosing between a wedding and a 30th birthday format. No event date booked."
+  },
+  {
+    "id": "CUST-015",
+    "name": "Olivia Pendergast",
+    "email": "olivia.pendergast@altitudefinance.com",
+    "plan": "enterprise",
+    "subscription_status": "active",
+    "signup_date": "2026-01-19",
+    "notes": "Altitude Finance — sales kickoff, 120 attendees, 2026-06-18 (Park City). Procurement and Legal in the loop from day one."
+  },
+  {
+    "id": "CUST-016",
+    "name": "Rohan Sundaram",
+    "email": "rohan.s@gmail.com",
+    "plan": "essentials",
+    "subscription_status": "completed",
+    "signup_date": "2025-06-14",
+    "notes": "35th birthday celebration, 20 guests, held 2025-08-30. Closed."
+  },
+  {
+    "id": "CUST-017",
+    "name": "Kira Halvorsen",
+    "email": "kira@halvorsenphotography.com",
+    "plan": "essentials",
+    "subscription_status": "active",
+    "signup_date": "2026-04-12",
+    "notes": "Halvorsen Photography — studio open house and client appreciation event, 40 guests, 2026-06-28 (Portland)."
+  },
+  {
+    "id": "CUST-018",
+    "name": "Maxwell O'Connor",
+    "email": "max.oconnor@vertexbiotech.com",
+    "plan": "enterprise",
+    "subscription_status": "prospect",
+    "signup_date": "2026-04-30",
+    "notes": "Vertex Biotech — evaluating Serenia against two other vendors for a 200-person company retreat. Decision expected mid-June."
+  },
+  {
+    "id": "CUST-019",
+    "name": "Esme Tanaka",
+    "email": "esme.tanaka@gmail.com",
+    "plan": "signature",
+    "subscription_status": "active",
+    "signup_date": "2025-12-04",
+    "notes": "40th birthday celebration, 55 guests, 2026-06-07 (Brooklyn)."
+  },
+  {
+    "id": "CUST-020",
+    "name": "Joaquin Restrepo",
+    "email": "joaquin.r@gmail.com",
+    "plan": "signature",
+    "subscription_status": "active",
+    "signup_date": "2026-02-18",
+    "notes": "Wedding with Latin-music programming, 95 guests, 2026-10-04 (Miami). Bilingual vendor requirements (English/Spanish)."
+  }
+]

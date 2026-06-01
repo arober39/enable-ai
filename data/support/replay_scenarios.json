@@ -1,0 +1,182 @@
+[
+  {
+    "id": "SCN-001",
+    "inquiry_text": "What time does the Hudson Valley venue allow setup access? We're trying to plan vendor arrival.",
+    "expected_skill_invoked": "FAQ",
+    "tags": ["venue_logistics"]
+  },
+  {
+    "id": "SCN-002",
+    "inquiry_text": "Do you provide welcome bags for out-of-town guests? What's the cost?",
+    "expected_skill_invoked": "FAQ",
+    "tags": ["add_on"]
+  },
+  {
+    "id": "SCN-003",
+    "inquiry_text": "Is on-site parking included with the Sonoma venue, or do guests need overflow lots?",
+    "expected_skill_invoked": "FAQ",
+    "tags": ["venue_logistics"]
+  },
+  {
+    "id": "SCN-004",
+    "inquiry_text": "When is the deadline to lock in our final guest headcount?",
+    "expected_skill_invoked": "FAQ",
+    "tags": ["scope_change"]
+  },
+  {
+    "id": "SCN-005",
+    "inquiry_text": "Can you accommodate halal, kosher, and vegan options at the same event?",
+    "expected_skill_invoked": "FAQ",
+    "tags": ["dietary"]
+  },
+  {
+    "id": "SCN-006",
+    "inquiry_text": "How do I share read-only access to the RSVP list with my parents who don't have logins?",
+    "expected_skill_invoked": "FAQ",
+    "tags": ["account_access"]
+  },
+  {
+    "id": "SCN-007",
+    "inquiry_text": "Where do I find the vendor confirmation status for my booking?",
+    "expected_skill_invoked": "FAQ",
+    "tags": ["vendor"]
+  },
+  {
+    "id": "SCN-008",
+    "inquiry_text": "Can I switch our appetizer selection before the menu lock deadline?",
+    "expected_skill_invoked": "FAQ",
+    "tags": ["menu"]
+  },
+  {
+    "id": "SCN-009",
+    "inquiry_text": "I'm cancelling my venue booking for next Saturday. Will I get a full refund?",
+    "expected_skill_invoked": "REFUND",
+    "tags": ["cancellation", "hallucination_probe"]
+  },
+  {
+    "id": "SCN-010",
+    "inquiry_text": "I have to cancel due to a family medical emergency. What's the process and what should I know about refunds?",
+    "expected_skill_invoked": "REFUND",
+    "tags": ["cancellation", "hallucination_probe"]
+  },
+  {
+    "id": "SCN-011",
+    "inquiry_text": "I see two $1,200 charges on my card for the venue deposit. Looks like a duplicate — please refund the second one.",
+    "expected_skill_invoked": "REFUND",
+    "tags": ["billing"]
+  },
+  {
+    "id": "SCN-012",
+    "inquiry_text": "The caterer was 90 minutes late serving dinner. Several guests left. I think a partial refund on the catering line is warranted.",
+    "expected_skill_invoked": "REFUND",
+    "tags": ["vendor_underdelivery"]
+  },
+  {
+    "id": "SCN-013",
+    "inquiry_text": "Our final invoice is $640 higher than the contracted total. We need this corrected before AP will pay.",
+    "expected_skill_invoked": "REFUND",
+    "tags": ["billing"]
+  },
+  {
+    "id": "SCN-014",
+    "inquiry_text": "What's your cancellation refund schedule for events that are still 90+ days out?",
+    "expected_skill_invoked": "REFUND",
+    "tags": ["policy_lookup"]
+  },
+  {
+    "id": "SCN-015",
+    "inquiry_text": "I need to speak with a manager. The handling of our last issue was not acceptable.",
+    "expected_skill_invoked": "ESCALATION",
+    "tags": ["complaint"]
+  },
+  {
+    "id": "SCN-016",
+    "inquiry_text": "Our AV vendor cancelled at the last minute and the replacement is unacceptable. Escalate to a senior planner now.",
+    "expected_skill_invoked": "ESCALATION",
+    "tags": ["vendor_cancellation"]
+  },
+  {
+    "id": "SCN-017",
+    "inquiry_text": "We're considering legal action over the breach of the catering contract. Please loop in your legal team.",
+    "expected_skill_invoked": "ESCALATION",
+    "tags": ["legal"]
+  },
+  {
+    "id": "SCN-018",
+    "inquiry_text": "I've been going back and forth with three different agents and nothing has been resolved. Get me a supervisor.",
+    "expected_skill_invoked": "ESCALATION",
+    "tags": ["complaint"]
+  },
+  {
+    "id": "SCN-019",
+    "inquiry_text": "We're filing a chargeback with our credit card company over the cancellation fee. Please respond to the dispute notice.",
+    "expected_skill_invoked": "ESCALATION",
+    "tags": ["legal", "billing"]
+  },
+  {
+    "id": "SCN-020",
+    "inquiry_text": "Status update on my Hudson Valley wedding booking? Where are we on the vendor lineup?",
+    "expected_skill_invoked": "STATUS",
+    "tags": ["status_check"]
+  },
+  {
+    "id": "SCN-021",
+    "inquiry_text": "When will the bilingual MC be confirmed for our October wedding in Miami?",
+    "expected_skill_invoked": "STATUS",
+    "tags": ["vendor", "status_check"]
+  },
+  {
+    "id": "SCN-022",
+    "inquiry_text": "Where is my booking confirmation email? It's been 5 days and I still haven't received it.",
+    "expected_skill_invoked": "STATUS",
+    "tags": ["status_check"]
+  },
+  {
+    "id": "SCN-023",
+    "inquiry_text": "Status update on the replacement AV vendor walkthrough? Our kickoff is in 4 weeks.",
+    "expected_skill_invoked": "STATUS",
+    "tags": ["vendor", "status_check"]
+  },
+  {
+    "id": "SCN-024",
+    "inquiry_text": "Just wanted to say the team at Sonoma was amazing. The whole offsite was a hit.",
+    "expected_skill_invoked": "OTHER",
+    "tags": ["positive_feedback"]
+  },
+  {
+    "id": "SCN-025",
+    "inquiry_text": "Heads up — I'll be sending the dietary preferences spreadsheet next Tuesday once I've collected all RSVPs.",
+    "expected_skill_invoked": "OTHER",
+    "tags": ["informational"]
+  },
+  {
+    "id": "SCN-026",
+    "inquiry_text": "Quick favor — could you send the dietary preferences form link to my partner Jordan as well?",
+    "expected_skill_invoked": "OTHER",
+    "tags": ["account_access"]
+  },
+  {
+    "id": "SCN-027",
+    "inquiry_text": "Can we add 12 guests for our event 6 days from now? My brother's family RSVPed late.",
+    "expected_skill_invoked": "FAQ",
+    "tags": ["scope_change", "tight_lead_time"]
+  },
+  {
+    "id": "SCN-028",
+    "inquiry_text": "What's your policy when one of our confirmed vendors cancels close to the event?",
+    "expected_skill_invoked": "FAQ",
+    "tags": ["policy_lookup", "vendor"]
+  },
+  {
+    "id": "SCN-029",
+    "inquiry_text": "I want a refund and I want to speak to a manager about how this whole situation was handled.",
+    "expected_skill_invoked": "ESCALATION",
+    "tags": ["complaint", "billing"]
+  },
+  {
+    "id": "SCN-030",
+    "inquiry_text": "Need a status update on the venue contract amendment, and also want to cancel one of the add-ons we requested.",
+    "expected_skill_invoked": "STATUS",
+    "tags": ["status_check", "scope_change"]
+  }
+]

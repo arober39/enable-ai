@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "intercom": {
+      "command": "npx",
+      "args": [
+        "@intercom/mcp-server"
+      ],
+      "env": {
+        "INTERCOM_API_KEY": "${INTERCOM_API_KEY}"
+      }
+    },
+    "zendesk": {
+      "command": "npx",
+      "args": [
+        "mcp-server-zendesk"
+      ],
+      "env": {
+        "ZENDESK_API_TOKEN": "${ZENDESK_API_TOKEN}"
+      }
+    }
+  }
+}

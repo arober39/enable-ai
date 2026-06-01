@@ -1,0 +1,24 @@
+canonical_name: hubspot
+vendor: HubSpot
+categories: [crm, marketing_automation, customer_data]
+native_ai_features:
+  - name: Breeze (HubSpot AI)
+    description: HubSpot's umbrella AI brand — assistants for content drafting, prospect research, and CRM data lookups in-product.
+    maturity: ga
+    coverage: medium
+  - name: ChatSpot
+    description: Conversational interface over CRM data; lets human reps query their HubSpot data in natural language.
+    maturity: ga
+    coverage: medium
+  - name: Predictive lead scoring
+    description: ML scoring of CRM records based on engagement and fit.
+    maturity: ga
+    coverage: low
+api_surface:
+  has_rest_api: true
+  has_webhooks: true
+  rate_limits: standard
+integration_patterns:
+  - augment_with_custom_ai
+  - orchestrate_into_unified_surface
+notes: "HubSpot's native AI is in-product — useful for human reps but not exposed to external orchestrators as a reasoning engine. The CRM data itself (account, plan tier, subscription status, prior tickets) is the primary asset to expose to a custom support orchestrator via API."
