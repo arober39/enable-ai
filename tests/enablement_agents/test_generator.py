@@ -204,7 +204,7 @@ def test_ai_configs_manifest_pins_tutorial_constants(tmp_path: Path) -> None:
     )
     for needle in [
         "support-orchestrator-config",
-        "claude-sonnet-4-7",
+        "claude-sonnet-4-6",
         "mode: completion",
         "v1-baseline",
         "v2-detailed-responses",
@@ -220,7 +220,7 @@ def test_orchestrator_py_contains_runtime_constants(tmp_path: Path) -> None:
         '"support.escalation"',
         '"support.error"',
         '"support-orchestrator-config"',
-        '"claude-sonnet-4-7"',
+        '"claude-sonnet-4-6"',
     ]:
         assert needle in orch, f"orchestrator.py missing constant: {needle}"
 
