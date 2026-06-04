@@ -694,8 +694,8 @@ Stop. Report what was built. Wait for my acknowledgment.
 Provisions the AI Configs required for the support orchestrator via the LaunchDarkly REST API. Specifications:
 - Reads the manifest at `orchestrators/support/ai_configs.manifest.yaml` (generated in Phase 5)
 - Provisions one AI Config named `support-orchestrator-config` in **completion mode** with two variations:
-  - `v1-baseline` — prompt loaded from `orchestrators/support/prompts/v1_baseline.md`, model `claude-sonnet-4-7`, set as the default variation
-  - `v2-detailed-responses` — prompt loaded from `orchestrators/support/prompts/v2_detailed_responses.md`, model `claude-sonnet-4-7`
+  - `v1-baseline` — prompt loaded from `orchestrators/support/prompts/v1_baseline.md`, model `claude-sonnet-4-6`, set as the default variation
+  - `v2-detailed-responses` — prompt loaded from `orchestrators/support/prompts/v2_detailed_responses.md`, model `claude-sonnet-4-6`
 - Each variation has its system prompt, model, max_tokens, temperature
 - Initial traffic: 100% v1-baseline, 0% v2-detailed-responses
 - Exits 0 on success, non-zero on failure with a structured error report

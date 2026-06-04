@@ -25,7 +25,7 @@ demo mode off) use real Claude + LaunchDarkly.
 Tutorial-critical constants below are bit-exact:
   - AI Config name:        "support-orchestrator-config"
   - Event names:           "support.escalation", "support.error"
-  - Model:                 claude-sonnet-4-7
+  - Model:                 claude-sonnet-4-6
 
 Do not change these without updating the multi-signal guardrails tutorial.
 """
@@ -41,7 +41,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
 
+from dotenv import find_dotenv, load_dotenv
 from pydantic import BaseModel, ConfigDict, Field
+
+# Walk up from cwd to the repo root and load .env. override=False so vars
+# already in the process environment (CI, `set -a; source .env`, tests) win.
+load_dotenv(find_dotenv(usecwd=True), override=False)
 
 from orchestrators.support.observability import EXPECTED_SPAN_NAMES, span
 
@@ -55,7 +60,7 @@ logger = logging.getLogger(__name__)
 AI_CONFIG_NAME = "support-orchestrator-config"
 EVENT_ESCALATION = "support.escalation"
 EVENT_ERROR = "support.error"
-MODEL_NAME = "claude-sonnet-4-7"
+MODEL_NAME = "claude-sonnet-4-6"
 
 
 # ---------------------------------------------------------------------------
@@ -154,7 +159,7 @@ async def fetch_ai_config(request_id: str, customer_id: str) -> AIConfigResult:
         ld_client = LDClient(LDConfig(sdk_key=os.environ["LAUNCHDARKLY_SDK_KEY"]))
         ai_client = LDAIClient(ld_client)
         ld_context = Context.builder(request_id).kind("request").build()
-        result = ai_client.config(AI_CONFIG_NAME, ld_context, default_value=None)
+        result = ai_client.completion_config(AI_CONFIG_NAME, ld_context, default=None)
         # The exact shape varies; this code is the canonical pattern the
         # tutorial references. Adjust to the SDK's current API surface.
         system_prompt = ""

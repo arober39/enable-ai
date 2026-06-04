@@ -3,7 +3,7 @@
 Reads `orchestrators/support/ai_configs.manifest.yaml` (generated in Phase 5)
 and creates/updates the `support-orchestrator-config` AI Config on the
 configured LD project. Two variations: `v1-baseline` (the default) and
-`v2-detailed-responses`. Both use claude-sonnet-4-7 in completion mode.
+`v2-detailed-responses`. Both use claude-sonnet-4-6 in completion mode.
 
 Initial traffic: 100% v1-baseline, 0% v2-detailed-responses. The
 multi-signal guardrails tutorial then walks the user through ramping v2
