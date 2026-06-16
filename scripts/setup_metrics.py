@@ -114,7 +114,7 @@ def _metric_exists(
 ) -> bool:
     """Return True if the metric is already provisioned in the project."""
     resp = client.get(
-        f"{_LD_API_BASE}/projects/{project_key}/metrics/{metric_key}",
+        f"{_LD_API_BASE}/metrics/{project_key}/{metric_key}",
         headers=_api_headers(api_key),
     )
     if resp.status_code == 404:
@@ -133,7 +133,7 @@ def _create_metric(
     """Create one metric. Raises on non-success."""
     payload = _metric_payload(spec)
     resp = client.post(
-        f"{_LD_API_BASE}/projects/{project_key}/metrics",
+        f"{_LD_API_BASE}/metrics/{project_key}",
         headers=_api_headers(api_key),
         json=payload,
     )

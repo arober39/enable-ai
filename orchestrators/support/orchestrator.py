@@ -33,11 +33,14 @@ Do not change these without updating the multi-signal guardrails tutorial.
 from __future__ import annotations
 
 import asyncio
+import atexit
 import json
 import logging
 import os
+import random
+import re
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -121,11 +124,17 @@ def _first_text_block(msg: Any) -> str:
 
 @dataclass
 class AIConfigResult:
-    """Subset of the LD AI Config response the orchestrator needs."""
+    """Subset of the LD AI Config response the orchestrator needs, plus the
+    per-request tracker and judge wiring used to record AgentControl metrics."""
 
     variation_name: str
     system_prompt: str
     model: str
+    enabled: bool = True
+    params: dict = field(default_factory=dict)
+    judges: list = field(default_factory=list)
+    tracker: Any = None
+    context: Any = None
 
 
 _PROMPT_DIR = Path(__file__).resolve().parent / "prompts"
@@ -135,6 +144,119 @@ def _load_default_prompt(variation: str = "v1_baseline") -> str:
     """Read the on-disk baseline prompt as the demo-mode fallback."""
     path = _PROMPT_DIR / f"{variation}.md"
     return path.read_text(encoding="utf-8") if path.exists() else ""
+
+
+# Reuse one LDClient / LDAIClient / Anthropic client across requests. The old
+# code created a fresh LDClient on every call and never flushed or closed it, so
+# the analytics events it buffered (generation metrics, custom events) were
+# usually dropped before delivery. A single client, closed at exit, flushes them.
+_LD: dict[str, Any] = {"client": None, "ai": None}
+_ANTHROPIC: dict[str, Any] = {"client": None}
+
+
+def _ld_clients() -> tuple[Any, Any]:
+    """Return the shared (LDClient, LDAIClient), creating them once."""
+    if _LD["client"] is None:
+        from ldai.client import LDAIClient
+        from ldclient import LDClient
+        from ldclient.config import Config as LDConfig
+
+        client = LDClient(LDConfig(sdk_key=os.environ["LAUNCHDARKLY_SDK_KEY"]))
+        _LD["client"] = client
+        _LD["ai"] = LDAIClient(client)
+        atexit.register(client.close)  # close() flushes buffered analytics events
+    return _LD["client"], _LD["ai"]
+
+
+def _anthropic_client() -> Any:
+    """Return the shared AsyncAnthropic client, creating it once."""
+    if _ANTHROPIC["client"] is None:
+        from anthropic import AsyncAnthropic
+
+        _ANTHROPIC["client"] = AsyncAnthropic()
+    return _ANTHROPIC["client"]
+
+
+def _anthropic_metrics(response: Any) -> Any:
+    """Map an Anthropic Messages response to LDAIMetrics for track_metrics_of_async."""
+    from ldai.providers.types import LDAIMetrics
+    from ldai.tracker import TokenUsage
+
+    usage = response.usage
+    return LDAIMetrics(
+        success=True,
+        tokens=TokenUsage(
+            total=usage.input_tokens + usage.output_tokens,
+            input=usage.input_tokens,
+            output=usage.output_tokens,
+        ),
+    )
+
+
+async def run_judges(ai_config: AIConfigResult, question: str, answer: str) -> None:
+    """Run each judge attached to the served variation and record its score in LD.
+
+    The judge's prompt, model, and evaluation metric key all come from its
+    AgentControl config. The SDK's managed judge runner
+    (``create_judge().evaluate()``) only supports the openai/langchain provider
+    packages, and this judge uses an Anthropic model, so we run the judge prompt
+    with the Anthropic client and report the score through the documented
+    ``tracker.track_judge_result()``. (To use the managed runner instead, add the
+    ``launchdarkly-server-sdk-ai-langchain`` provider and switch this to
+    ``create_judge().evaluate()``.)
+    """
+    if ai_config.tracker is None or not ai_config.judges:
+        return
+    from ldai.models import AIJudgeConfigDefault
+    from ldai.providers import JudgeResult
+
+    _, ai_client = _ld_clients()
+    policy_text = load_policies()
+    client = _anthropic_client()
+
+    for judge_key, sampling_rate in ai_config.judges:
+        if random.random() > (sampling_rate or 0.0):
+            continue
+        judge = ai_client.judge_config(
+            judge_key, ai_config.context, AIJudgeConfigDefault(enabled=False)
+        )
+        if not getattr(judge, "enabled", False) or not getattr(
+            judge, "evaluation_metric_key", None
+        ):
+            continue
+        template = judge.messages[0].content if judge.messages else ""
+        try:
+            prompt = template.format(
+                policy_context=policy_text, question=question, response=answer
+            )
+        except (KeyError, IndexError):
+            prompt = (
+                f"{template}\n\nPolicy documentation:\n{policy_text}\n\n"
+                f"Customer question: {question}\n\nAgent response: {answer}"
+            )
+        try:
+            msg = await client.messages.create(
+                model=judge.model.name,
+                max_tokens=16,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = _first_text_block(msg).strip()
+            match = re.search(r"\d?\.\d+|\d", raw)
+            score = float(match.group()) if match else None
+        except Exception:  # noqa: BLE001 — a judge failure must not break the reply
+            logger.exception("judge %s evaluation failed", judge_key)
+            continue
+        if score is None:
+            continue
+        ai_config.tracker.track_judge_result(
+            JudgeResult(
+                judge_config_key=judge_key,
+                success=True,
+                sampled=True,
+                metric_key=judge.evaluation_metric_key,
+                score=score,
+            )
+        )
 
 
 async def fetch_ai_config(request_id: str, customer_id: str) -> AIConfigResult:
@@ -151,27 +273,43 @@ async def fetch_ai_config(request_id: str, customer_id: str) -> AIConfigResult:
                 model=MODEL_NAME,
             )
 
-        # Production path — uses the real LD SDK.
-        from ldai.client import LDAIClient  # type: ignore[import-untyped]
-        from ldclient import Context, LDClient
-        from ldclient.config import Config as LDConfig
+        # Production path — every configuration detail (variation, model,
+        # parameters, prompt, attached judges) comes from the AgentControl
+        # config. We also mint the per-request tracker here so the generation
+        # and judge calls downstream record metrics against the served variation.
+        from ldclient import Context
 
-        ld_client = LDClient(LDConfig(sdk_key=os.environ["LAUNCHDARKLY_SDK_KEY"]))
-        ai_client = LDAIClient(ld_client)
+        ld_client, ai_client = _ld_clients()
         ld_context = Context.builder(request_id).kind("request").build()
-        result = ai_client.completion_config(AI_CONFIG_NAME, ld_context, default=None)
-        # The exact shape varies; this code is the canonical pattern the
-        # tutorial references. Adjust to the SDK's current API surface.
-        system_prompt = ""
-        if result and getattr(result, "messages", None):
-            for msg in result.messages:
-                if getattr(msg, "role", None) == "system":
-                    system_prompt = msg.content
-                    break
+        config = ai_client.completion_config(AI_CONFIG_NAME, ld_context, default=None)
+
+        if not getattr(config, "enabled", False):
+            # LD served the disabled variation; fall back to the on-disk baseline.
+            return AIConfigResult(
+                variation_name="v1-baseline",
+                system_prompt=_load_default_prompt("v1_baseline"),
+                model=MODEL_NAME,
+                enabled=False,
+                context=ld_context,
+            )
+
+        messages = config.messages or []
+        system_prompt = next((m.content for m in messages if m.role == "system"), "")
+        params = dict((config.model.to_dict().get("parameters") if config.model else None) or {})
+        judges = [
+            (j.key, j.sampling_rate)
+            for j in (config.judge_configuration.judges if config.judge_configuration else [])
+        ]
+        meta = config.to_dict().get("_ldMeta", {}) if hasattr(config, "to_dict") else {}
         return AIConfigResult(
-            variation_name=getattr(result, "variation_name", "v1-baseline"),
+            variation_name=meta.get("variationKey", "v1-baseline"),
             system_prompt=system_prompt or _load_default_prompt("v1_baseline"),
-            model=getattr(getattr(result, "model", None), "name", MODEL_NAME),
+            model=config.model.name if config.model else MODEL_NAME,
+            enabled=True,
+            params=params,
+            judges=judges,
+            tracker=config.create_tracker(),
+            context=ld_context,
         )
 
 
@@ -187,10 +325,9 @@ def track_event(event_name: str, request_id: str, metric_value: int) -> None:
             )
             return
 
-        from ldclient import Context, LDClient
-        from ldclient.config import Config as LDConfig
+        from ldclient import Context
 
-        ld_client = LDClient(LDConfig(sdk_key=os.environ["LAUNCHDARKLY_SDK_KEY"]))
+        ld_client, _ = _ld_clients()
         ld_context = Context.builder(request_id).kind("request").build()
         ld_client.track(event_name, ld_context, metric_value=metric_value)
 
@@ -232,10 +369,10 @@ async def classify_intent(inquiry: Inquiry, ai_config: AIConfigResult) -> Intent
             s.set_attribute("classifier", "stub")
             return intent
 
-        # Production path — real LLM call.
-        from anthropic import AsyncAnthropic
-
-        client = AsyncAnthropic()
+        # Production path — real LLM call. Intent classification is internal
+        # pre-processing, so it is not recorded as the config's generation; the
+        # customer-facing draft (in draft_refund_response) is the tracked run.
+        client = _anthropic_client()
         msg = await client.messages.create(
             model=ai_config.model or MODEL_NAME,
             max_tokens=64,
@@ -312,25 +449,34 @@ async def draft_refund_response(
             )
             return reply, ["data/support/policies.md#cancellation-refund-schedule"]
 
-        from anthropic import AsyncAnthropic
+        client = _anthropic_client()
+        # Model parameters (max_tokens, temperature, ...) come from the AgentControl
+        # config and pass through in the snake_case shape Anthropic's SDK expects.
+        params = dict(ai_config.params)
+        params.setdefault("max_tokens", 512)
 
-        client = AsyncAnthropic()
-        msg = await client.messages.create(
-            model=ai_config.model or MODEL_NAME,
-            max_tokens=512,
-            system=ai_config.system_prompt,
-            messages=[
-                {
-                    "role": "user",
-                    "content": (
-                        f"Customer question:\n{inquiry.subject}\n\n{inquiry.body}\n\n"
-                        f"Policy documentation:\n{policy_text}\n\n"
-                        f"Draft a reply that answers the question. "
-                        f"Cite policy details only when they directly answer the question."
-                    ),
-                }
-            ],
-        )
+        def _draft_call() -> Any:
+            return client.messages.create(
+                model=ai_config.model or MODEL_NAME,
+                system=ai_config.system_prompt,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Customer question:\n{inquiry.subject}\n\n{inquiry.body}\n\n"
+                            f"Policy documentation:\n{policy_text}\n\n"
+                            f"Draft a reply that answers the question. "
+                            f"Cite policy details only when they directly answer the question."
+                        ),
+                    }
+                ],
+                **params,
+            )
+
+        if ai_config.tracker is not None:
+            msg = await ai_config.tracker.track_metrics_of_async(_anthropic_metrics, _draft_call)
+        else:
+            msg = await _draft_call()
         reply = _first_text_block(msg).strip() if msg.content else ""
         return reply, ["data/support/policies.md"]
 
@@ -379,6 +525,9 @@ async def handle_inquiry(inquiry: Inquiry, request_id: str | None = None) -> Sup
                 )
             elif intent == "REFUND":
                 reply, citations = await draft_refund_response(inquiry, ai_config)
+                # Score the drafted reply with any judge attached to this
+                # variation; the judge metric feeds the guarded rollout.
+                await run_judges(ai_config, f"{inquiry.subject}\n\n{inquiry.body}", reply)
                 response = SupportResponse(
                     intent=intent,
                     draft_reply=reply,

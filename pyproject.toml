@@ -19,7 +19,7 @@ dependencies = [
     "openinference-instrumentation==0.1.50",
     "opentelemetry-sdk==1.41.1",
     "httpx==0.28.1",
-    "launchdarkly-server-sdk-ai==0.19.0",
+    "launchdarkly-server-sdk-ai==1.1.0",
     "python-dotenv==1.2.2",
 ]
 
