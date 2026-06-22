@@ -131,8 +131,8 @@ class AIConfigResult:
     system_prompt: str
     model: str
     enabled: bool = True
-    params: dict = field(default_factory=dict)
-    judges: list = field(default_factory=list)
+    params: dict[str, Any] = field(default_factory=dict)
+    judges: list[tuple[str, float]] = field(default_factory=list)
     tracker: Any = None
     context: Any = None
 
@@ -215,26 +215,29 @@ async def run_judges(ai_config: AIConfigResult, question: str, answer: str) -> N
     client = _anthropic_client()
 
     for judge_key, sampling_rate in ai_config.judges:
-        if random.random() > (sampling_rate or 0.0):
+        # Default to always-sample when the rate is unset; an explicit 0.0 means never.
+        if random.random() > (sampling_rate if sampling_rate is not None else 1.0):
             continue
-        judge = ai_client.judge_config(
-            judge_key, ai_config.context, AIJudgeConfigDefault(enabled=False)
-        )
-        if not getattr(judge, "enabled", False) or not getattr(
-            judge, "evaluation_metric_key", None
-        ):
-            continue
-        template = judge.messages[0].content if judge.messages else ""
+        # Best-effort telemetry: any failure in the per-judge pipeline (config
+        # retrieval, template access, or the model call) must not break the reply.
         try:
-            prompt = template.format(
-                policy_context=policy_text, question=question, response=answer
+            judge = ai_client.judge_config(
+                judge_key, ai_config.context, AIJudgeConfigDefault(enabled=False)
             )
-        except (KeyError, IndexError):
-            prompt = (
-                f"{template}\n\nPolicy documentation:\n{policy_text}\n\n"
-                f"Customer question: {question}\n\nAgent response: {answer}"
-            )
-        try:
+            if not getattr(judge, "enabled", False) or not getattr(
+                judge, "evaluation_metric_key", None
+            ):
+                continue
+            template = judge.messages[0].content if judge.messages else ""
+            try:
+                prompt = template.format(
+                    policy_context=policy_text, question=question, response=answer
+                )
+            except (KeyError, IndexError):
+                prompt = (
+                    f"{template}\n\nPolicy documentation:\n{policy_text}\n\n"
+                    f"Customer question: {question}\n\nAgent response: {answer}"
+                )
             msg = await client.messages.create(
                 model=judge.model.name,
                 max_tokens=16,
@@ -243,20 +246,20 @@ async def run_judges(ai_config: AIConfigResult, question: str, answer: str) -> N
             raw = _first_text_block(msg).strip()
             match = re.search(r"\d?\.\d+|\d", raw)
             score = float(match.group()) if match else None
+            if score is None:
+                continue
+            ai_config.tracker.track_judge_result(
+                JudgeResult(
+                    judge_config_key=judge_key,
+                    success=True,
+                    sampled=True,
+                    metric_key=judge.evaluation_metric_key,
+                    score=score,
+                )
+            )
         except Exception:  # noqa: BLE001 — a judge failure must not break the reply
             logger.exception("judge %s evaluation failed", judge_key)
             continue
-        if score is None:
-            continue
-        ai_config.tracker.track_judge_result(
-            JudgeResult(
-                judge_config_key=judge_key,
-                success=True,
-                sampled=True,
-                metric_key=judge.evaluation_metric_key,
-                score=score,
-            )
-        )
 
 
 async def fetch_ai_config(request_id: str, customer_id: str) -> AIConfigResult:
