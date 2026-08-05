@@ -1,5 +1,7 @@
 # Enable AI: Architecture and Build Plan (v1.2)
 
+> **Historical document.** This was the source of truth for the v1 build (Coordinator + Support Enablement Agent + tutorial-aligned orchestrator), which is complete on disk. The project direction changed on 2026-06-04 and again on 2026-08-05 — see `VISION.md` for the current direction. Do not resume the phases below.
+
 This document is the build plan for Enable AI, an AI enablement orchestration system that operates on a fictional company (Serenia & Co.). The v1 goal is to ship the coordinator and the Support Enablement Agent end-to-end, plus the support orchestrator the agent generates — sufficient to support the first published tutorial (`tutorial-01-multi-signal-guardrails`).
 
 ## How to use this document

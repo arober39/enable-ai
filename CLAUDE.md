@@ -1,6 +1,6 @@
 # Enable AI
 
-Enable AI is an AI enablement orchestration system that operates on a fictional company (Serenia & Co.). A hub-and-spoke Coordinator agent routes inbound enablement requests to specialized Enablement Subagents, which produce structured plans and generate runnable per-department orchestrators. The v1 deliverable is the Coordinator plus the Support Enablement Agent end-to-end, plus the support orchestrator the agent generates.
+Enable AI is a diagnosis-first AI enablement platform: it audits a team's tool stack, recommends where AI genuinely fits, executes the rollout (plan-as-data workflows on a fixed interpreter, native-AI setup guides, consolidation plans), and measures whether the recommendation paid off. It is developed through a software factory and built in public. Demo data comes from a fictional company (Serenia & Co.).
 
 ## Architectural principles
 
@@ -10,9 +10,9 @@ The architectural principles that govern every decision are defined in `@./.clau
 
 Serenia & Co. is the fictional company this system operates on. See `@./SERENIA.md` for the org chart, customer personas, recurring scenarios, and brand voice.
 
-## In-progress build state
+## Direction and build state
 
-The full build plan, phase-by-phase, lives in `@./BUILD_PLAN.md`. Future Claude Code sessions resuming this work should read it first.
+The product vision, factory milestones, and build-in-public program live in `@./VISION.md`. Future Claude Code sessions resuming this work should read it first. `BUILD_PLAN.md` is the historical v1 spec — do not resume its phases.
 
 ## Build and run
 
