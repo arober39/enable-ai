@@ -37,7 +37,7 @@ ui = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["coordinator*", "enablement_agents*", "orchestrators*"]
+include = ["core*", "coordinator*", "enablement_agents*", "orchestrators*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
