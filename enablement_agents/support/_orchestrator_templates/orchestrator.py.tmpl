@@ -48,9 +48,17 @@ from pydantic import BaseModel, ConfigDict, Field
 # already in the process environment (CI, `set -a; source .env`, tests) win.
 load_dotenv(find_dotenv(usecwd=True), override=False)
 
+from core.credentials import runtime_credentials
 from orchestrators.support.observability import EXPECTED_SPAN_NAMES, span
 
 logger = logging.getLogger(__name__)
+
+# Locked phase 1 commitment (#1): orchestrators read credentials through a
+# Credentials provider, never `os.environ` directly. The spawner (UI's
+# /api/run-orchestrator or `make run` with .env loaded) populates env vars
+# from the user's credential store before this process starts; the provider
+# is a thin read-only wrapper around os.environ today, swappable later.
+_CREDS = runtime_credentials()
 
 
 # ---------------------------------------------------------------------------
@@ -144,7 +152,7 @@ async def fetch_ai_config(request_id: str, customer_id: str) -> AIConfigResult:
         ai_config_name=AI_CONFIG_NAME,
         customer_id=customer_id,
     ):
-        if _demo_mode() or not os.environ.get("LAUNCHDARKLY_SDK_KEY"):
+        if _demo_mode() or not _CREDS.get("LAUNCHDARKLY_SDK_KEY"):
             return AIConfigResult(
                 variation_name="v1-baseline",
                 system_prompt=_load_default_prompt("v1_baseline"),
@@ -156,7 +164,7 @@ async def fetch_ai_config(request_id: str, customer_id: str) -> AIConfigResult:
         from ldclient import Context, LDClient
         from ldclient.config import Config as LDConfig
 
-        ld_client = LDClient(LDConfig(sdk_key=os.environ["LAUNCHDARKLY_SDK_KEY"]))
+        ld_client = LDClient(LDConfig(sdk_key=_CREDS.require("LAUNCHDARKLY_SDK_KEY")))
         ai_client = LDAIClient(ld_client)
         ld_context = Context.builder(request_id).kind("request").build()
         result = ai_client.completion_config(AI_CONFIG_NAME, ld_context, default=None)
@@ -178,7 +186,7 @@ async def fetch_ai_config(request_id: str, customer_id: str) -> AIConfigResult:
 def track_event(event_name: str, request_id: str, metric_value: int) -> None:
     """Emit a LaunchDarkly custom event. No-op in demo mode."""
     with span("support_orchestrator.emit_events", event_name=event_name, metric_value=metric_value):
-        if _demo_mode() or not os.environ.get("LAUNCHDARKLY_SDK_KEY"):
+        if _demo_mode() or not _CREDS.get("LAUNCHDARKLY_SDK_KEY"):
             logger.debug(
                 "track_event (demo-mode no-op): event=%s request_id=%s value=%s",
                 event_name,
@@ -190,7 +198,7 @@ def track_event(event_name: str, request_id: str, metric_value: int) -> None:
         from ldclient import Context, LDClient
         from ldclient.config import Config as LDConfig
 
-        ld_client = LDClient(LDConfig(sdk_key=os.environ["LAUNCHDARKLY_SDK_KEY"]))
+        ld_client = LDClient(LDConfig(sdk_key=_CREDS.require("LAUNCHDARKLY_SDK_KEY")))
         ld_context = Context.builder(request_id).kind("request").build()
         ld_client.track(event_name, ld_context, metric_value=metric_value)
 
@@ -226,7 +234,7 @@ async def classify_intent(inquiry: Inquiry, ai_config: AIConfigResult) -> Intent
         "support_orchestrator.classify_intent",
         variation_name=ai_config.variation_name,
     ) as s:
-        if _demo_mode() or not os.environ.get("ANTHROPIC_API_KEY"):
+        if _demo_mode() or not _CREDS.get("ANTHROPIC_API_KEY"):
             intent = _stub_classify_intent(inquiry)
             s.set_attribute("intent", intent)
             s.set_attribute("classifier", "stub")
@@ -300,7 +308,7 @@ async def draft_refund_response(
     """Draft a refund-related reply grounded in the policy doc."""
     with span("support_orchestrator.draft_response", variation_name=ai_config.variation_name):
         policy_text = load_policies()
-        if _demo_mode() or not os.environ.get("ANTHROPIC_API_KEY"):
+        if _demo_mode() or not _CREDS.get("ANTHROPIC_API_KEY"):
             # Stub: cite the cancellation schedule. Never volunteer policies
             # the customer didn't ask about — even with the v2 prompt.
             reply = (
