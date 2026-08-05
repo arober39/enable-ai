@@ -1,25 +1,12 @@
 "use client";
 
-import type { EnablementResponse, CapabilityFinding, Recommendation } from "../lib/types";
+import type { EnablementResponse, CapabilityFinding } from "../lib/types";
 
 const STATUS_STYLES: Record<CapabilityFinding["status"], string> = {
   covered: "bg-emerald-100 text-emerald-800",
   partial: "bg-amber-100 text-amber-800",
   gap: "bg-rose-100 text-rose-800",
   redundant: "bg-violet-100 text-violet-800",
-};
-
-const KIND_STYLES: Record<Recommendation["kind"], string> = {
-  use_native_ai: "bg-sky-100 text-sky-800",
-  augment_with_custom_ai: "bg-indigo-100 text-indigo-800",
-  consolidate: "bg-fuchsia-100 text-fuchsia-800",
-  orchestrate: "bg-emerald-100 text-emerald-800",
-};
-
-const EFFORT_LABEL: Record<Recommendation["effort"], string> = {
-  small: "S",
-  medium: "M",
-  large: "L",
 };
 
 interface Props {
@@ -84,48 +71,10 @@ export default function PlanDisplay({ response }: Props) {
         </ul>
       </section>
 
-      <section>
-        <h3 className="mb-2 text-base font-semibold">
-          Recommendations ({plan.recommendations.length})
-        </h3>
-        <ul className="space-y-2">
-          {plan.recommendations.map((r) => (
-            <li
-              key={r.id}
-              className="rounded-md border border-neutral-200 bg-white p-3"
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-sm">{r.id}</span>
-                <div className="flex items-center gap-1.5">
-                  <span
-                    className={
-                      "rounded px-2 py-0.5 text-xs font-semibold uppercase " +
-                      KIND_STYLES[r.kind]
-                    }
-                  >
-                    {r.kind.replace(/_/g, " ")}
-                  </span>
-                  <span
-                    className="rounded bg-neutral-200 px-1.5 py-0.5 text-[10px] font-bold"
-                    title={`effort: ${r.effort}`}
-                  >
-                    {EFFORT_LABEL[r.effort]}
-                  </span>
-                </div>
-              </div>
-              <p className="mt-2 text-sm text-neutral-700">{r.description}</p>
-              {r.tools_affected.length > 0 && (
-                <div className="mt-1 text-xs text-neutral-500">
-                  tools affected: {r.tools_affected.join(", ")}
-                </div>
-              )}
-              {r.notes && (
-                <div className="mt-1 text-xs text-neutral-700">{r.notes}</div>
-              )}
-            </li>
-          ))}
-        </ul>
-      </section>
+      <p className="text-xs text-neutral-500">
+        {plan.recommendations.length} recommendation(s) ready —
+        pick one to build below.
+      </p>
 
       {plan.orchestrator_pr_plan && (
         <section>

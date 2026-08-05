@@ -1,8 +1,19 @@
 import type {
+  CredentialRevealResponse,
+  CredentialSummary,
   EnablementPlan,
   EnablementResponse,
-  GenerateOrchestratorResponse,
+  GeneratorRunResult,
+  OrchestratorResponse,
+  Recommendation,
+  RoleSummary,
+  RunOrchestratorRequest,
+  SavedRecommendation,
   ToolSummary,
+  UserPreferences,
+  WorkflowDefinition,
+  BuildResult,
+  WorkflowRunResult,
 } from "./types";
 
 // In dev we call the FastAPI backend directly (CORS configured server-side
@@ -64,20 +75,85 @@ export function listTools(): Promise<ToolSummary[]> {
   return fetchJson<ToolSummary[]>("/api/tools");
 }
 
-export function runEnablement(tools: string[]): Promise<EnablementResponse> {
+export function researchTool(name: string): Promise<ToolSummary> {
+  return fetchJson<ToolSummary>("/api/tools/research", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function deleteCachedTool(name: string): Promise<{ removed: boolean }> {
+  return fetchJson<{ removed: boolean }>(
+    `/api/tools/cache/${encodeURIComponent(name)}`,
+    { method: "DELETE" },
+  );
+}
+
+export function runEnablement(
+  tools: string[],
+  role?: string,
+): Promise<EnablementResponse> {
   return fetchJson<EnablementResponse>("/api/enablement", {
     method: "POST",
-    body: JSON.stringify({ tools }),
+    body: JSON.stringify({ tools, ...(role ? { role } : {}) }),
+  });
+}
+
+export function listRoles(): Promise<RoleSummary[]> {
+  return fetchJson<RoleSummary[]>("/api/roles");
+}
+
+export function getPreferences(): Promise<UserPreferences> {
+  return fetchJson<UserPreferences>("/api/preferences");
+}
+
+export function setSelectedRole(role: string): Promise<UserPreferences> {
+  return fetchJson<UserPreferences>("/api/preferences/role", {
+    method: "PUT",
+    body: JSON.stringify({ role }),
   });
 }
 
 export function generateOrchestrator(
   plan: EnablementPlan,
-): Promise<GenerateOrchestratorResponse> {
-  return fetchJson<GenerateOrchestratorResponse>("/api/generate-orchestrator", {
+  selectedRecommendationId: string,
+  role?: string,
+): Promise<GeneratorRunResult> {
+  return fetchJson<GeneratorRunResult>("/api/generate-orchestrator", {
     method: "POST",
-    body: JSON.stringify({ plan }),
+    body: JSON.stringify({
+      plan,
+      selected_recommendation_id: selectedRecommendationId,
+      ...(role ? { role } : {}),
+    }),
   });
+}
+
+// ----- Saved recommendations -----
+
+export function listSavedRecommendations(): Promise<SavedRecommendation[]> {
+  return fetchJson<SavedRecommendation[]>("/api/saved-recommendations");
+}
+
+export function saveRecommendation(args: {
+  role_id: string;
+  tools: string[];
+  plan_summary: string;
+  recommendation: Recommendation;
+}): Promise<SavedRecommendation> {
+  return fetchJson<SavedRecommendation>("/api/saved-recommendations", {
+    method: "POST",
+    body: JSON.stringify(args),
+  });
+}
+
+export function deleteSavedRecommendation(
+  id: string,
+): Promise<{ removed: boolean }> {
+  return fetchJson<{ removed: boolean }>(
+    `/api/saved-recommendations/${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+  );
 }
 
 export function fetchHealth(): Promise<{
@@ -86,4 +162,86 @@ export function fetchHealth(): Promise<{
   has_anthropic_key: boolean;
 }> {
   return fetchJson("/api/health");
+}
+
+// ----- Credentials -----
+
+export function listCredentials(): Promise<CredentialSummary[]> {
+  return fetchJson<CredentialSummary[]>("/api/credentials");
+}
+
+export function upsertCredential(
+  key: string,
+  value: string,
+): Promise<CredentialSummary> {
+  return fetchJson<CredentialSummary>(`/api/credentials/${encodeURIComponent(key)}`, {
+    method: "PUT",
+    body: JSON.stringify({ value }),
+  });
+}
+
+export function deleteCredential(key: string): Promise<{ deleted: boolean }> {
+  return fetchJson<{ deleted: boolean }>(
+    `/api/credentials/${encodeURIComponent(key)}`,
+    { method: "DELETE" },
+  );
+}
+
+export function revealCredential(
+  key: string,
+): Promise<CredentialRevealResponse> {
+  return fetchJson<CredentialRevealResponse>(
+    `/api/credentials/${encodeURIComponent(key)}/reveal`,
+  );
+}
+
+// ----- Run orchestrator -----
+
+export function runOrchestrator(
+  req: RunOrchestratorRequest,
+): Promise<OrchestratorResponse> {
+  return fetchJson<OrchestratorResponse>("/api/run-orchestrator", {
+    method: "POST",
+    body: JSON.stringify(req),
+  });
+}
+
+// ----- Phase 2.1 workflow endpoints (the new primary path) -----
+
+export function buildWorkflow(
+  plan: EnablementPlan,
+  selectedRecommendationId: string,
+  tools: string[],
+  role?: string,
+): Promise<BuildResult> {
+  return fetchJson<BuildResult>("/api/build-workflow", {
+    method: "POST",
+    body: JSON.stringify({
+      plan,
+      selected_recommendation_id: selectedRecommendationId,
+      tools,
+      ...(role ? { role } : {}),
+    }),
+  });
+}
+
+export function runWorkflow(
+  payload: Record<string, unknown>,
+  role?: string,
+): Promise<WorkflowRunResult> {
+  return fetchJson<WorkflowRunResult>("/api/run-workflow", {
+    method: "POST",
+    body: JSON.stringify({ payload, ...(role ? { role } : {}) }),
+  });
+}
+
+export function listWorkflows(): Promise<WorkflowDefinition[]> {
+  return fetchJson<WorkflowDefinition[]>("/api/workflows");
+}
+
+export function deleteWorkflow(roleId: string): Promise<{ removed: boolean }> {
+  return fetchJson<{ removed: boolean }>(
+    `/api/workflows/${encodeURIComponent(roleId)}`,
+    { method: "DELETE" },
+  );
 }

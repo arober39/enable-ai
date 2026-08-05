@@ -4,15 +4,56 @@ import { useEffect, useState } from "react";
 import BuildOrchestrator from "./components/BuildOrchestrator";
 import LoadingPanel from "./components/LoadingPanel";
 import PlanDisplay from "./components/PlanDisplay";
+import RolePicker from "./components/RolePicker";
+import RunInquiryPanel from "./components/RunInquiryPanel";
+import SavedRecommendations from "./components/SavedRecommendations";
 import Spinner from "./components/Spinner";
-import ToolSelector from "./components/ToolSelector";
-import { fetchHealth, listTools, runEnablement } from "./lib/api";
-import type { EnablementResponse, ToolSummary } from "./lib/types";
+import ToolPicker from "./components/ToolPicker";
+import {
+  deleteCachedTool,
+  fetchHealth,
+  getPreferences,
+  listRoles,
+  listSavedRecommendations,
+  listTools,
+  researchTool,
+  runEnablement,
+  setSelectedRole,
+} from "./lib/api";
+import type {
+  ArtifactKind,
+  EnablementResponse,
+  RoleSummary,
+  SavedRecommendation,
+  ToolSummary,
+} from "./lib/types";
 
 export default function Home() {
   const [tools, setTools] = useState<ToolSummary[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [roles, setRoles] = useState<RoleSummary[]>([]);
+  const [selectedRole, setSelectedRoleState] = useState<string | null>(null);
+  const [savedRecs, setSavedRecs] = useState<SavedRecommendation[]>([]);
   const [result, setResult] = useState<EnablementResponse | null>(null);
+  // The artifact kind from the most recent successful build, or null
+  // if no build has happened (or last attempt failed). Step 6 (Send an
+  // inquiry) shows only when this is "workflow" — setup guides and
+  // migration plans don't have a runtime to call.
+  const [lastArtifactKind, setLastArtifactKind] = useState<ArtifactKind | null>(null);
+  // Incremented after each successful workflow build. Used as a React
+  // `key` on RunInquiryPanel so it remounts and re-fetches the freshly
+  // persisted workflow's sample_request.
+  const [buildVersion, setBuildVersion] = useState(0);
+
+  const handleBuilt = (kind: ArtifactKind | null) => {
+    setLastArtifactKind(kind);
+    // Only bump buildVersion (which forces RunInquiryPanel to refetch)
+    // when a runtime workflow was actually built. Other artifact kinds
+    // don't change what the panel would display.
+    if (kind === "workflow") {
+      setBuildVersion((v) => v + 1);
+    }
+  };
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [health, setHealth] = useState<{
@@ -25,12 +66,60 @@ export default function Home() {
     listTools()
       .then((data) => {
         setTools(data);
-        // Default: pre-select Intercom + Zendesk so first-time visitors see
-        // a non-trivial plan when they hit Submit.
-        setSelected(new Set(["intercom", "zendesk"]));
+        // Default: pre-select Intercom + Zendesk if they exist in the
+        // catalog (seed tools), so first-time visitors see a non-trivial
+        // plan when they hit Submit.
+        const seeds = new Set(data.map((t) => t.name));
+        const presel = new Set<string>();
+        if (seeds.has("intercom")) presel.add("intercom");
+        if (seeds.has("zendesk")) presel.add("zendesk");
+        setSelected(presel);
       })
       .catch((e: Error) => setError(e.message));
+    Promise.all([listRoles(), getPreferences()])
+      .then(([roleList, prefs]) => {
+        setRoles(roleList);
+        setSelectedRoleState(prefs.selected_role);
+      })
+      .catch((e: Error) => setError(e.message));
+    refreshSaved();
   }, []);
+
+  const refreshSaved = () => {
+    listSavedRecommendations()
+      .then(setSavedRecs)
+      .catch(() => {
+        /* non-fatal */
+      });
+  };
+
+  const onRoleChange = (roleId: string) => {
+    setSelectedRoleState(roleId);
+    // Persist asynchronously; surface failures via the error pane but don't
+    // block the optimistic UI update — the picker should feel instant.
+    setSelectedRole(roleId).catch((e: Error) => setError(e.message));
+  };
+
+  const onResearch = async (name: string) => {
+    const added = await researchTool(name);
+    setTools((prev) => {
+      const next = prev.filter((t) => t.name !== added.name);
+      next.push(added);
+      next.sort((a, b) => a.vendor.localeCompare(b.vendor));
+      return next;
+    });
+    setSelected((prev) => new Set(prev).add(added.name));
+  };
+
+  const onDeleteCached = async (name: string) => {
+    await deleteCachedTool(name);
+    setTools((prev) => prev.filter((t) => t.name !== name));
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.delete(name);
+      return next;
+    });
+  };
 
   const toggle = (name: string) => {
     setSelected((prev) => {
@@ -46,7 +135,10 @@ export default function Home() {
     setError(null);
     setResult(null);
     try {
-      const resp = await runEnablement(Array.from(selected));
+      const resp = await runEnablement(
+        Array.from(selected),
+        selectedRole ?? undefined,
+      );
       setResult(resp);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -60,8 +152,8 @@ export default function Home() {
       <header>
         <h1 className="text-2xl font-bold">Enable AI — test UI</h1>
         <p className="mt-1 text-sm text-neutral-600">
-          Pick a support stack. Get an EnablementPlan from the Support
-          Enablement Agent.
+          Pick a role and a stack. The Enablement Agent proposes
+          recommendations; pick one to generate a runnable orchestrator.
         </p>
         {health && (
           <p className="mt-2 text-xs text-neutral-500">
@@ -71,9 +163,27 @@ export default function Home() {
         )}
       </header>
 
+      <SavedRecommendations items={savedRecs} onRemoved={refreshSaved} />
+
+
       <section>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold">1. Select your tools</h2>
+          <h2 className="text-base font-semibold">1. Pick your role</h2>
+          <span className="text-xs text-neutral-500">
+            Loads role-specific agent context
+          </span>
+        </div>
+        <RolePicker
+          roles={roles}
+          selected={selectedRole}
+          onSelect={onRoleChange}
+          disabled={loading}
+        />
+      </section>
+
+      <section>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-base font-semibold">2. Select your tools</h2>
           <span className="text-xs text-neutral-500">
             {selected.size} of {tools.length} selected
           </span>
@@ -83,10 +193,12 @@ export default function Home() {
             Loading catalog…
           </div>
         ) : (
-          <ToolSelector
+          <ToolPicker
             tools={tools}
             selected={selected}
             onToggle={toggle}
+            onResearch={onResearch}
+            onDeleteCached={onDeleteCached}
             disabled={loading}
           />
         )}
@@ -94,7 +206,7 @@ export default function Home() {
 
       <section>
         <h2 className="mb-3 text-base font-semibold">
-          2. Run the Support Enablement Agent
+          3. Run the Enablement Agent
         </h2>
         <button
           type="button"
@@ -129,32 +241,56 @@ export default function Home() {
 
       {loading && (
         <section>
-          <h2 className="mb-3 text-base font-semibold">3. In progress</h2>
+          <h2 className="mb-3 text-base font-semibold">4. In progress</h2>
           <LoadingPanel demoMode={!!health?.demo_mode} />
         </section>
       )}
 
       {result && !loading && (
         <section>
-          <h2 className="mb-3 text-base font-semibold">3. Plan</h2>
+          <h2 className="mb-3 text-base font-semibold">4. Plan</h2>
           <PlanDisplay response={result} />
         </section>
       )}
 
-      {result && !loading && (
+      {result && !loading && selectedRole && (
         <section>
           <h2 className="mb-3 text-base font-semibold">
-            4. Build the orchestrator
+            5. Pick one recommendation and build
           </h2>
           <p className="mb-3 text-sm text-neutral-700">
-            Materialize the orchestrator tree on disk from this plan. The
-            files land under{" "}
+            The LLM-driven 4-stage pipeline writes one{" "}
             <code className="rounded bg-neutral-100 px-1 py-0.5 font-mono text-xs">
-              orchestrators/{result.plan.department}/
+              orchestrator.py
+            </code>{" "}
+            under{" "}
+            <code className="rounded bg-neutral-100 px-1 py-0.5 font-mono text-xs">
+              orchestrators/local/{selectedRole}/
             </code>
-            . Any previous generation at that path is overwritten.
+            . Other recommendations can be parked for later from this list.
           </p>
-          <BuildOrchestrator plan={result.plan} />
+          <BuildOrchestrator
+            plan={result.plan}
+            roleId={selectedRole}
+            selectedTools={Array.from(selected)}
+            onSaved={refreshSaved}
+            onBuilt={handleBuilt}
+          />
+        </section>
+      )}
+
+      {result && !loading && lastArtifactKind === "workflow" && (
+        <section>
+          <h2 className="mb-3 text-base font-semibold">6. Send an inquiry</h2>
+          <p className="mb-3 text-xs text-neutral-500">
+            Shown only because the most recent build produced a runtime
+            workflow. If you build a setup guide or migration plan next,
+            this section will hide — those kinds don't have a runtime to
+            call.
+          </p>
+          {/* `key` changes on each workflow build → remounts the panel
+              → its useEffect re-fetches the latest workflow's sample. */}
+          <RunInquiryPanel key={buildVersion} />
         </section>
       )}
     </main>
