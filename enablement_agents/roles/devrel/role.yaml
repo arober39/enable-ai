@@ -1,0 +1,14 @@
+id: devrel
+display_name: Developer Relations
+department: devrel
+description: >
+  Developer content, code samples, community engagement, documentation,
+  open-source triage, developer survey synthesis.
+capabilities:
+  - tutorial and blog drafting
+  - code sample generation and verification
+  - community sentiment analysis
+  - documentation gap identification
+  - open-source issue and PR triage
+  - developer survey synthesis
+  - conference talk and content recommendation

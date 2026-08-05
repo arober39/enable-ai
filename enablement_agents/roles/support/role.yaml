@@ -1,0 +1,14 @@
+id: support
+display_name: Customer Support
+department: support
+description: >
+  Inbound customer support: ticket triage, response drafting, escalation
+  routing, knowledge base retrieval.
+capabilities:
+  - intent classification
+  - first-response drafting
+  - escalation routing
+  - FAQ retrieval
+  - sentiment analysis
+  - conversation summarization
+  - knowledge base search

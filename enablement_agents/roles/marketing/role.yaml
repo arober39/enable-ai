@@ -1,0 +1,14 @@
+id: marketing
+display_name: Marketing
+department: marketing
+description: >
+  Demand generation, content marketing, campaign analytics, audience
+  segmentation, lead scoring.
+capabilities:
+  - audience segmentation
+  - content drafting
+  - campaign A/B test analysis
+  - lead scoring and qualification
+  - persona generation
+  - SEO and SEM keyword research
+  - performance attribution

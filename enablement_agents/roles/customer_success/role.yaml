@@ -1,0 +1,14 @@
+id: customer_success
+display_name: Customer Success
+department: customer_success
+description: >
+  Account health, churn risk, renewals, expansion, QBR preparation,
+  proactive outreach.
+capabilities:
+  - health score modeling
+  - churn risk prediction
+  - renewal forecasting
+  - expansion identification
+  - QBR and EBR preparation
+  - CS playbook recommendation
+  - call and email summarization
