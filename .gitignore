@@ -41,3 +41,6 @@ ui/web/out/
 ui/web/test-results/
 ui/web/playwright-report/
 ui/web/playwright/.cache/
+
+# TypeScript incremental build info
+ui/web/tsconfig.tsbuildinfo
