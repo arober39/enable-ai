@@ -52,9 +52,7 @@ def test_observability_module_imports() -> None:
 
 
 def test_hubspot_mcp_server_imports() -> None:
-    mod = importlib.import_module(
-        "orchestrators.support.mcp_servers.hubspot.server"
-    )
+    mod = importlib.import_module("orchestrators.support.mcp_servers.hubspot.server")
     assert callable(mod.build_hubspot_mcp_server)
 
 
@@ -84,13 +82,29 @@ def test_orchestrator_py_references_each_expected_span() -> None:
     from pathlib import Path
 
     orch_py = (
-        Path(__file__).resolve().parents[2]
-        / "orchestrators"
-        / "support"
-        / "orchestrator.py"
+        Path(__file__).resolve().parents[2] / "orchestrators" / "support" / "orchestrator.py"
     ).read_text(encoding="utf-8")
     for name in _REQUIRED_SPAN_NAMES:
         assert name in orch_py, f"orchestrator.py doesn't emit span: {name}"
+
+
+_REQUIRED_TELEMETRY_HOOKS: tuple[str, ...] = (
+    "atexit.register",
+    "track_metrics_of_async",
+    "track_judge_result",
+    "runtime_credentials",
+)
+
+
+def test_orchestrator_py_wires_shared_client_and_tracker() -> None:
+    """Guarded-rollout data path: one flushed LDClient, tracker, judges, creds."""
+    from pathlib import Path
+
+    orch_py = (
+        Path(__file__).resolve().parents[2] / "orchestrators" / "support" / "orchestrator.py"
+    ).read_text(encoding="utf-8")
+    for needle in _REQUIRED_TELEMETRY_HOOKS:
+        assert needle in orch_py, f"orchestrator.py missing telemetry hook: {needle}"
 
 
 # ---------------------------------------------------------------------------
@@ -172,3 +186,26 @@ async def test_handle_inquiry_response_shape() -> None:
     assert isinstance(response.escalated, bool)
     # error is None in the success path
     assert response.error is None
+
+
+def test_select_policy_context_returns_one_section_not_the_full_doc() -> None:
+    mod = importlib.import_module("orchestrators.support.orchestrator")
+    body, citation = mod.select_policy_context(
+        "I'm cancelling my venue booking for next Saturday. Will I get a full refund?"
+    )
+    assert "Cancellation refund schedule" in body
+    assert "## Vendor substitution" not in body
+    assert "## Escalation policy" not in body
+    assert citation.endswith("#cancellation-refund-schedule")
+
+
+def test_select_policy_context_postponement_probe_does_not_include_invented_policy() -> None:
+    """Postponement is not in policies.md; retrieval must not invent a section."""
+    mod = importlib.import_module("orchestrators.support.orchestrator")
+    full = mod.load_policies()
+    body, _citation = mod.select_policy_context(
+        "If we postpone instead of cancelling, can we reschedule once within 12 months?"
+    )
+    assert body != full
+    assert "12 months" not in body
+    assert "postponement" not in body.lower()
