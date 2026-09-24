@@ -1,0 +1,10 @@
+tool: gainsight
+mcp_server:
+  available: false
+  origin: null
+  maintained_by: null
+  url: null
+  install: null
+  tools_exposed: []
+fallback_if_unavailable: direct_api
+notes: "No vendor-maintained or mature community MCP server at time of writing. A CS orchestrator should generate a minimal stub against Gainsight's REST API, scoped to read paths: get_account, get_health_score, list_ctas. Write paths (playbook enrollment) are out of scope until the stub is proven."

@@ -1,0 +1,25 @@
+canonical_name: vitally
+vendor: Vitally
+categories: [customer_success, product_usage, health_scoring]
+native_ai_features:
+  - name: Vitally AI summaries
+    description: In-product account and conversation summaries generated from traits, product events, and notes Vitally already stores.
+    maturity: ga
+    coverage: medium
+  - name: Usage-based health scores
+    description: Health and churn-risk scores driven primarily by product-usage events and configurable traits.
+    maturity: ga
+    coverage: high
+  - name: Play and indicator suggestions
+    description: Suggested plays when usage or trait thresholds fire; rule-driven more than a general reasoning engine.
+    maturity: ga
+    coverage: medium
+api_surface:
+  has_rest_api: true
+  has_webhooks: true
+  rate_limits: standard
+integration_patterns:
+  - augment_with_custom_ai
+  - orchestrate_into_unified_surface
+  - consolidate
+notes: "Vitally is strongest as a product-usage health layer, not as a cross-system CS brain. Its native AI is in-product and cannot see Gong call sentiment or Gainsight renewal CTAs. Overlaps Gainsight on health scoring — Diagnose should treat the pair as a consolidate-or-orchestrate question, with Vitally's usage events as the unique asset to expose via API."

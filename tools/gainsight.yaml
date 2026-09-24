@@ -1,0 +1,24 @@
+canonical_name: gainsight
+vendor: Gainsight
+categories: [customer_success, health_scoring, renewal_management]
+native_ai_features:
+  - name: Gainsight AI (Horizon)
+    description: In-product assistant for account timelines, health-score explanations, and playbook suggestions inside the Gainsight workspace.
+    maturity: ga
+    coverage: medium
+  - name: Automated health scoring
+    description: Rules-plus-ML health scores from product usage, support tickets, NPS, and CSM activity that Gainsight can see.
+    maturity: ga
+    coverage: high
+  - name: CTA and timeline summarization
+    description: Generated summaries of account activity and open CTAs for CSM prep — stays inside Gainsight's own timeline.
+    maturity: ga
+    coverage: medium
+api_surface:
+  has_rest_api: true
+  has_webhooks: true
+  rate_limits: standard
+integration_patterns:
+  - augment_with_custom_ai
+  - orchestrate_into_unified_surface
+notes: "Gainsight's native AI is competent for health scores and playbook triggers on data already in Gainsight, but it is not an external reasoning engine. It cannot natively join call sentiment from Gong or booking-usage detail from Vitally. The health-score and CTA objects are the assets to expose to a custom CS orchestrator; treat in-product AI as a CSM convenience, not the decision layer."

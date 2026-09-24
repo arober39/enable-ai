@@ -1,0 +1,21 @@
+# Serenia & Co.'s declared customer success tool stack.
+# CSMs use this set to score corporate-offsite and multi-event account
+# health, prep renewals, and coordinate outreach.
+department: customer_success
+declared_at: 2026-09-23
+tools:
+  - name: hubspot
+    primary_use: crm
+    description: Account profile, booking history, and subscription status for corporate and multi-event customers
+  - name: slack
+    primary_use: internal_handoff
+    description: CSM coordination channel for renewals, escalations, and QBR prep
+  - name: gainsight
+    primary_use: health_scoring
+    description: Account health, CS playbooks, and renewal pipeline for mid-market offsite accounts
+  - name: gong
+    primary_use: call_intelligence
+    description: Recorded CSM and AE calls — transcripts, coaching, and next-step extraction
+  - name: vitally
+    primary_use: product_usage
+    description: Product-usage health on Serenia's booking and planner SaaS surface

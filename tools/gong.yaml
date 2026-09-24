@@ -1,0 +1,24 @@
+canonical_name: gong
+vendor: Gong
+categories: [call_intelligence, conversation_intelligence, coaching]
+native_ai_features:
+  - name: Conversation intelligence
+    description: Transcripts, call summaries, topic tracking, and talk-to-listen metrics for recorded CSM and AE calls.
+    maturity: ga
+    coverage: high
+  - name: Ask Gong
+    description: Natural-language Q&A over a team's recorded calls, grounded in Gong's own corpus — not CRM or CS-platform data.
+    maturity: ga
+    coverage: medium
+  - name: Deal and forecast insights
+    description: In-product risk flags and next-step suggestions derived from call language; coaching scorecards for managers.
+    maturity: ga
+    coverage: medium
+api_surface:
+  has_rest_api: true
+  has_webhooks: true
+  rate_limits: standard
+integration_patterns:
+  - augment_with_custom_ai
+  - orchestrate_into_unified_surface
+notes: "Gong's native AI is strong at summarizing and searching calls but is workspace-grounded — it does not reason over HubSpot contract state or Gainsight health. The transcript and structured-insight APIs are the assets to pull into a custom orchestrator so a call summary can cite open tickets and renewal risk instead of just what was said."

@@ -1,0 +1,10 @@
+tool: gong
+mcp_server:
+  available: false
+  origin: null
+  maintained_by: null
+  url: null
+  install: null
+  tools_exposed: []
+fallback_if_unavailable: direct_api
+notes: "No vendor-maintained MCP server at time of writing. Use Gong's REST API directly. Scope a generated stub to read paths the CS orchestrator needs: list_calls, get_transcript, get_call_insights. Do not invent a community MCP URL."

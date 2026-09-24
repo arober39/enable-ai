@@ -1,0 +1,10 @@
+tool: vitally
+mcp_server:
+  available: false
+  origin: null
+  maintained_by: null
+  url: null
+  install: null
+  tools_exposed: []
+fallback_if_unavailable: direct_api
+notes: "No vendor-maintained or mature community MCP server at time of writing. Generate a stub against Vitally's REST API scoped to get_account, get_health_score, list_product_events. Trait writes stay out of scope for v1."
