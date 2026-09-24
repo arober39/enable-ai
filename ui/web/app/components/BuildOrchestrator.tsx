@@ -48,6 +48,8 @@ interface Props {
   roleId: string;
   selectedTools: string[];
   onSaved: () => void;
+  selectedRecommendationId: string | null;
+  onSelectRecommendation: (id: string) => void;
   /**
    * Called after every build attempt (success or failure) with the
    * artifact_kind of the result, or `null` on failure. The page uses
@@ -65,11 +67,13 @@ export default function BuildOrchestrator({
   selectedTools,
   onSaved,
   onBuilt,
+  selectedRecommendationId,
+  onSelectRecommendation,
 }: Props) {
   const recs = plan.recommendations;
-  const [selectedRecId, setSelectedRecId] = useState<string | null>(
-    recs[0]?.id ?? null,
-  );
+  const selectedRecId = recs.some((rec) => rec.id === selectedRecommendationId)
+    ? selectedRecommendationId
+    : (recs[0]?.id ?? null);
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<BuildResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -179,7 +183,7 @@ export default function BuildOrchestrator({
                   name="rec-pick"
                   className="mt-1 h-4 w-4 accent-current text-accent"
                   checked={isSelected}
-                  onChange={() => setSelectedRecId(r.id)}
+                  onChange={() => onSelectRecommendation(r.id)}
                   disabled={building}
                 />
                 <div className="flex-1">
