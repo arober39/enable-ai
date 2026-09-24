@@ -1,17 +1,21 @@
 """Role registry loader.
 
-Each role lives at `enablement_agents/roles/<role_id>/`:
+Each seeded role lives at `enablement_agents/roles/<role_id>/`:
   - role.yaml — id, display_name, department, description, capabilities
   - domain_knowledge.md — the AI-enablement reference for that role
 
-Future sessions adding a role: drop a directory, fill in the two files,
-the loader picks it up. No registration step required.
+Future sessions adding a seeded role: drop a directory, fill in the two
+files, the loader picks it up. No registration step required.
+
+Researched roles are not stored here. They live in the per-user cache
+loaded by `core.role_catalog`, with domain knowledge on the role itself.
 """
 
 from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
@@ -34,14 +38,34 @@ class Role(BaseModel):
     description: str = Field(min_length=1)
     capabilities: list[str] = Field(min_length=1)
 
+    #: Markdown reference for AI-enabled work in this job. Seeded roles
+    #: leave this empty and keep the text in domain_knowledge.md.
+    #: Researched roles set it and have no directory.
+    domain_knowledge: str = ""
+
+    #: "seed" for on-disk registry entries, "researched" for the per-user cache.
+    source: Literal["seed", "researched"] = "seed"
+
     #: Filesystem path to this role's directory. Not stored in role.yaml;
-    #: populated by the loader. Callers read `domain_knowledge_path` for
-    #: the system-prompt source.
-    directory: Path
+    #: populated by the seeded loader. None for researched roles — read
+    #: `domain_knowledge` instead of inventing a path.
+    directory: Path | None = None
 
     @property
-    def domain_knowledge_path(self) -> Path:
+    def domain_knowledge_path(self) -> Path | None:
+        """On-disk domain_knowledge.md, or None when this role has no directory."""
+        if self.directory is None:
+            return None
         return self.directory / _DOMAIN_KNOWLEDGE
+
+    def domain_knowledge_text(self) -> str:
+        """Inline researched markdown, otherwise the on-disk file contents."""
+        if self.domain_knowledge.strip():
+            return self.domain_knowledge
+        path = self.domain_knowledge_path
+        if path is not None and path.exists():
+            return path.read_text(encoding="utf-8")
+        return ""
 
     @property
     def agent_name(self) -> str:
