@@ -28,7 +28,8 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from core.credentials import Credentials
-from core.workflow import EqualityCondition, WorkflowDefinition, WorkflowStep
+from core.jev import should_escalate
+from core.workflow import EqualityCondition, WorkflowDefinition
 
 from .tool_adapters import builtin as _builtin  # noqa: F401 — side-effect: registers adapters
 from .tool_adapters.registry import get_adapter
@@ -147,6 +148,20 @@ async def run_workflow(
     context: dict[str, Any] = {"request": payload, "steps": {}}
     trace: list[StepTrace] = []
     final_output: dict[str, Any] | None = None
+
+    gate = should_escalate(payload, creds)
+    if gate["escalate"]:
+        return WorkflowRunResult(
+            ok=True,
+            output={
+                "escalated": True,
+                "mode": gate["mode"],
+                "source": gate["source"],
+                "reason": gate["reason"],
+                "noul": gate["noul"],
+            },
+            trace=[],
+        )
 
     for step in definition.steps:
         started = datetime.now(UTC)
