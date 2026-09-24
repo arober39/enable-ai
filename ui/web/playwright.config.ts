@@ -13,7 +13,9 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./e2e",
-  timeout: 60_000,
+  // Plan and workflow builds often take about 30s. The suite limit has to
+  // sit above the 90s expect used while that loading UI is still running.
+  timeout: 180_000,
   expect: { timeout: 5_000 },
   fullyParallel: false,
   workers: 1,

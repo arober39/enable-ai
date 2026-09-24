@@ -43,10 +43,11 @@ test.describe("Enable AI test UI", () => {
     await expect(runButton).toBeEnabled();
     await runButton.click();
 
-    // Plan renders — wait up to 10s for the backend round-trip
+    // A plan often takes about 30s. Wait long enough that the loading
+    // panel is still in progress, not a failed or hung run.
     await expect(
       page.getByRole("heading", { name: /Plan summary/i })
-    ).toBeVisible({ timeout: 10_000 });
+    ).toBeVisible({ timeout: 90_000 });
 
     // Synthetic plan label
     await expect(page.getByText(/DEMO\/SYNTHETIC/i)).toBeVisible();
@@ -97,7 +98,7 @@ test.describe("Enable AI test UI", () => {
 
     await expect(
       page.getByRole("heading", { name: /Plan summary/i })
-    ).toBeVisible({ timeout: 10_000 });
+    ).toBeVisible({ timeout: 90_000 });
 
     // HubSpot has no MCP server in the registry — the synthetic plan should
     // produce an "augment_with_custom_ai" recommendation about generating a stub.

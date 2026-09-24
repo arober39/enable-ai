@@ -27,9 +27,9 @@ import type {
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
 
-// Live-mode runs can take 30–90 seconds. The browser fetch has no default
-// timeout but we set one explicitly so a hung backend surfaces as an error
-// instead of a tab that spins forever.
+// A plan or a workflow build often takes about 30 seconds and should keep
+// its loading UI up the whole time. The browser fetch has no default
+// timeout; this limit only turns a hung backend into an error.
 const REQUEST_TIMEOUT_MS = 120_000;
 
 /** HTTP failure from the FastAPI backend. `status` is the response code. */
