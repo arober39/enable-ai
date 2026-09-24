@@ -1,8 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getPreferences, listWorkflows, runWorkflow } from "../lib/api";
-import type { StepTrace, WorkflowRunResult } from "../lib/types";
+import {
+  getPreferences,
+  listOutcomes,
+  listWorkflows,
+  outcomeSummary,
+  rollbackRecommendation,
+  runWorkflow,
+  workflowCredentials,
+} from "../lib/api";
+import { writePendingKeys } from "../lib/homeSession";
+import type { RequiredCredential } from "../lib/types";
+import type {
+  OutcomeRecord,
+  RecommendationMetrics,
+  StepTrace,
+  WorkflowRunResult,
+} from "../lib/types";
 import Spinner from "./Spinner";
 
 const _FALLBACK_PAYLOAD = JSON.stringify(
@@ -19,6 +34,13 @@ export default function RunInquiryPanel() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<WorkflowRunResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [outcomes, setOutcomes] = useState<OutcomeRecord[]>([]);
+  const [metrics, setMetrics] = useState<RecommendationMetrics[]>([]);
+  const [roleId, setRoleId] = useState<string | null>(null);
+  const [rollingBack, setRollingBack] = useState<string | null>(null);
+  const [requiredKeys, setRequiredKeys] = useState<RequiredCredential[]>([]);
+  const [missingKeys, setMissingKeys] = useState<string[]>([]);
+  const [checkingKeys, setCheckingKeys] = useState(false);
 
   // On mount, fetch the user's persisted workflow for the current role and
   // pre-fill the textarea from its sample_request. Falls back gracefully if
@@ -27,6 +49,11 @@ export default function RunInquiryPanel() {
   useEffect(() => {
     Promise.all([listWorkflows(), getPreferences()])
       .then(([workflows, prefs]) => {
+        setRoleId(prefs.selected_role);
+        refreshMeasure(prefs.selected_role);
+        refreshKeys(prefs.selected_role).catch(() => {
+          /* the run button still rechecks */
+        });
         const wf = workflows.find((w) => w.role_id === prefs.selected_role);
         if (wf && wf.sample_request && Object.keys(wf.sample_request).length > 0) {
           setPayloadText(JSON.stringify(wf.sample_request, null, 2));
@@ -37,6 +64,48 @@ export default function RunInquiryPanel() {
         /* non-fatal — keep the fallback payload */
       });
   }, []);
+
+  const refreshKeys = async (forRole: string | null) => {
+    const report = await workflowCredentials(forRole ?? undefined);
+    setRequiredKeys(report.required);
+    setMissingKeys(report.missing);
+    writePendingKeys(report.missing);
+    return report.missing;
+  };
+
+  const refreshMeasure = (forRole: string | null) => {
+    listOutcomes()
+      .then((recorded) => {
+        setOutcomes(
+          forRole ? recorded.filter((row) => row.role_id === forRole) : recorded,
+        );
+      })
+      .catch(() => {
+        /* history is optional; the run form still works */
+      });
+    outcomeSummary()
+      .then((rows) => {
+        setMetrics(forRole ? rows.filter((row) => row.role_id === forRole) : rows);
+      })
+      .catch(() => {
+        /* rates are optional */
+      });
+  };
+
+  const onRollback = async (recommendationId: string) => {
+    if (!roleId) return;
+    setRollingBack(recommendationId);
+    setError(null);
+    try {
+      await rollbackRecommendation(recommendationId, roleId);
+      setResult(null);
+      refreshMeasure(roleId);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRollingBack(null);
+    }
+  };
 
   const onRun = async () => {
     setLoading(true);
@@ -56,11 +125,17 @@ export default function RunInquiryPanel() {
     }
 
     try {
+      const stillMissing = await refreshKeys(roleId);
+      if (stillMissing.length > 0) {
+        setError(null);
+        return;
+      }
       const resp = await runWorkflow(parsed);
       setResult(resp);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
+      refreshMeasure(roleId);
       setLoading(false);
     }
   };
@@ -101,6 +176,42 @@ export default function RunInquiryPanel() {
             spellCheck={false}
           />
         </label>
+        {requiredKeys.length > 0 && missingKeys.length > 0 && (
+          <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">
+            <p className="font-semibold text-amber-950">
+              Add these keys before running
+            </p>
+            <p className="mt-1 text-amber-950">
+              This workflow reads them from the vault. Open{" "}
+              <a href="/settings" className="font-medium underline">
+                Settings
+              </a>
+              , add each one, then come back and check again.
+            </p>
+            <ul className="mt-2 space-y-1 font-mono text-xs">
+              {requiredKeys
+                .filter((row) => missingKeys.includes(row.key))
+                .map((row) => (
+                  <li key={`${row.tool}:${row.key}`}>
+                    {row.tool} → {row.key}
+                  </li>
+                ))}
+            </ul>
+            <button
+              type="button"
+              onClick={() => {
+                setCheckingKeys(true);
+                refreshKeys(roleId)
+                  .catch((e: Error) => setError(e.message))
+                  .finally(() => setCheckingKeys(false));
+              }}
+              disabled={checkingKeys}
+              className="mt-3 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white disabled:bg-neutral-400"
+            >
+              {checkingKeys ? "Checking Settings…" : "I've added these in Settings"}
+            </button>
+          </div>
+        )}
         <div className="mt-3">
           <button
             type="button"
@@ -158,6 +269,100 @@ export default function RunInquiryPanel() {
           )}
         </div>
       )}
+
+      <div className="rounded-lg border border-neutral-300 bg-white p-4">
+        <h3 className="mb-2 text-sm font-semibold">Measured outcomes</h3>
+        <p className="mb-3 text-xs text-neutral-500">
+          Per recommendation: run success, error rate, and how often tool
+          calls were real API calls rather than stubs. Rollback uninstalls
+          the runtime for that recommendation.
+        </p>
+        {metrics.length > 0 && (
+          <ul className="mb-4 space-y-2">
+            {metrics.map((row) => {
+              const key = `${row.role_id}:${row.recommendation_id ?? "none"}`;
+              const pct = (rate: number) => `${Math.round(rate * 100)}%`;
+              return (
+                <li key={key} className="rounded border border-neutral-200 p-2 text-xs">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <code className="font-mono">
+                      {row.recommendation_id ?? "unscoped"}
+                    </code>
+                    <span className="text-neutral-600">
+                      {row.runs} run{row.runs === 1 ? "" : "s"} · success{" "}
+                      {pct(row.success_rate)} · errors {pct(row.error_rate)} ·
+                      real calls {pct(row.real_call_rate)} · escalations{" "}
+                      {pct(row.escalation_rate)}
+                    </span>
+                    {row.installed && row.recommendation_id && (
+                      <button
+                        type="button"
+                        className="ml-auto rounded border border-rose-300 px-2 py-0.5 text-rose-800 hover:bg-rose-50 disabled:opacity-50"
+                        disabled={rollingBack === row.recommendation_id}
+                        onClick={() => onRollback(row.recommendation_id as string)}
+                      >
+                        {rollingBack === row.recommendation_id
+                          ? "Rolling back…"
+                          : "Roll back"}
+                      </button>
+                    )}
+                  </div>
+                  {row.rollbacks > 0 && (
+                    <p className="mt-1 text-neutral-500">
+                      Rolled back {row.rollbacks} time
+                      {row.rollbacks === 1 ? "" : "s"}.
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {outcomes.length === 0 ? (
+          <p className="text-xs text-neutral-500">No runs recorded yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {outcomes.slice(0, 8).map((outcome) => (
+              <li
+                key={outcome.id}
+                className="rounded border border-neutral-200 p-2 text-xs"
+              >
+                <div className="flex items-center gap-2">
+                  <span>
+                    {outcome.status === "ok"
+                      ? "✓"
+                      : outcome.status === "rolled_back"
+                        ? "↩"
+                        : "✗"}
+                  </span>
+                  <code className="font-mono">{outcome.id}</code>
+                  {outcome.recommendation_id && (
+                    <span className="text-neutral-500">
+                      · {outcome.recommendation_id}
+                    </span>
+                  )}
+                  <span className="ml-auto text-neutral-500">
+                    {outcome.duration_ms}ms
+                  </span>
+                </div>
+                {outcome.error && (
+                  <p className="mt-1 text-rose-700">{outcome.error}</p>
+                )}
+                {outcome.step_summaries.length > 0 && (
+                  <p className="mt-1 font-mono text-[11px] text-neutral-600">
+                    {outcome.step_summaries
+                      .map((step) => {
+                        const mode = step.mode ? ` (${step.mode})` : "";
+                        return `${step.tool}.${step.action}${mode}`;
+                      })
+                      .join(" → ")}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
