@@ -1,0 +1,20 @@
+canonical_name: discord
+vendor: Discord
+categories: [community, public_messaging, developer_community]
+native_ai_features:
+  - name: AutoMod
+    description: Rule and ML-based moderation for spam, keywords, and mention raids. Not a reasoning engine and not useful for sentiment analysis.
+    maturity: ga
+    coverage: low
+  - name: Conversation summaries
+    description: Limited in-product recap features on some surfaces; coverage and availability vary by client and plan, and they stay inside Discord.
+    maturity: beta
+    coverage: low
+api_surface:
+  has_rest_api: true
+  has_webhooks: true
+  rate_limits: strict
+integration_patterns:
+  - augment_with_custom_ai
+  - orchestrate_into_unified_surface
+notes: "Discord is a community surface, not an AI platform. Native AI is thin (moderation, occasional recaps) and cannot unify themes with GitHub issues or Discourse threads. The right pattern is to read channel history via API into a custom orchestrator that clusters sentiment and cites source posts — do not expect Discord to reason for you."

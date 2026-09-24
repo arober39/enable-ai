@@ -1,0 +1,15 @@
+tool: github
+mcp_server:
+  available: true
+  origin: official
+  maintained_by: GitHub
+  url: "https://github.com/github/github-mcp-server"
+  install: "docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN ghcr.io/github/github-mcp-server"
+  tools_exposed:
+    - "search_issues"
+    - "get_issue"
+    - "list_pull_requests"
+    - "get_file_contents"
+    - "search_code"
+fallback_if_unavailable: direct_api
+notes: "Official GitHub MCP server (local binary/container and hosted remote). Sufficient for DevRel triage patterns: search issues, read PR context, pull file contents for docs/sample verification. Write paths (creating issues, merging) should stay behind explicit human approval."

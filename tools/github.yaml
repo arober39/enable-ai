@@ -1,0 +1,24 @@
+canonical_name: github
+vendor: GitHub
+categories: [source_control, code_collaboration, open_source]
+native_ai_features:
+  - name: GitHub Copilot
+    description: In-editor code completion and chat grounded in the open repository context the developer has open — not a DevRel orchestrator.
+    maturity: ga
+    coverage: high
+  - name: Copilot code review and PR summaries
+    description: Suggested review comments and pull-request summaries inside GitHub. Quality varies; does not execute samples or check docs coverage.
+    maturity: ga
+    coverage: medium
+  - name: Issues Copilot
+    description: Draft issue summaries and suggested labels in the GitHub UI. Does not reproduce bugs or apply a project's contribution guide.
+    maturity: ga
+    coverage: low
+api_surface:
+  has_rest_api: true
+  has_webhooks: true
+  rate_limits: standard
+integration_patterns:
+  - augment_with_custom_ai
+  - orchestrate_into_unified_surface
+notes: "GitHub's native AI is strong for in-repo coding assistance and weak as a DevRel decision layer. It will not verify that a sample compiles, join a Discord thread to an issue, or refuse a hallucinated API. Custom AI should treat issues, PRs, and file contents as API-accessible assets and keep Copilot as an in-product convenience for human maintainers."

@@ -1,0 +1,20 @@
+canonical_name: discourse
+vendor: Discourse
+categories: [community, documentation_forum, knowledge_base]
+native_ai_features:
+  - name: Discourse AI
+    description: Optional in-product plugin for topic summaries, title suggestions, embeddings search, and a forum bot grounded in the local Discourse corpus.
+    maturity: ga
+    coverage: medium
+  - name: Related topics
+    description: Embedding-based similar-topic suggestions that help readers stay on the forum; does not search GitHub or Discord.
+    maturity: ga
+    coverage: low
+api_surface:
+  has_rest_api: true
+  has_webhooks: true
+  rate_limits: standard
+integration_patterns:
+  - augment_with_custom_ai
+  - orchestrate_into_unified_surface
+notes: "Discourse AI is a capable in-forum assistant (summaries, search, bot replies) but it is not an external reasoning engine and cannot see GitHub issues or Discord. Treat topics and search as API-accessible assets; custom AI is what joins unanswered threads to documentation gaps and open issues."

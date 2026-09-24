@@ -1,0 +1,10 @@
+tool: discord
+mcp_server:
+  available: false
+  origin: null
+  maintained_by: null
+  url: null
+  install: null
+  tools_exposed: []
+fallback_if_unavailable: direct_api
+notes: "Community Discord MCP servers exist but none are vendor-maintained or stable enough to pin. Do not invent a URL. A DevRel orchestrator should generate a stub against Discord's REST API scoped to list_channels, get_channel_history, get_thread. Bot-token writes (posting as the brand) stay out of scope until a tone judge exists."

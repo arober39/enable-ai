@@ -1,0 +1,10 @@
+tool: discourse
+mcp_server:
+  available: false
+  origin: null
+  maintained_by: null
+  url: null
+  install: null
+  tools_exposed: []
+fallback_if_unavailable: direct_api
+notes: "No vendor-maintained MCP server at time of writing. Use Discourse's REST API. Scope a generated stub to search_topics, get_topic, list_unanswered. Reply/write paths require a human-tone check before they should be exposed."

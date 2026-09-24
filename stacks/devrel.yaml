@@ -1,0 +1,18 @@
+# Serenia & Co.'s declared developer relations tool stack.
+# Engineering and DevRel use this set to ship booking-platform docs,
+# triage public issues, and listen to the integrator community.
+department: devrel
+declared_at: 2026-09-23
+tools:
+  - name: slack
+    primary_use: internal_handoff
+    description: Internal DevRel and engineering coordination for docs, releases, and community escalations
+  - name: github
+    primary_use: source_control
+    description: Booking-platform repos, public SDKs, issue triage, and sample-code PRs
+  - name: discord
+    primary_use: community
+    description: Public integrator community for the planner API and vendor-catalog webhooks
+  - name: discourse
+    primary_use: documentation_forum
+    description: Docs-adjacent community Q&A and long-form threads that feed documentation gaps
