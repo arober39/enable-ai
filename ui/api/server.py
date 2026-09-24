@@ -4,7 +4,9 @@ Endpoints:
   - GET    /api/tools                          — seed catalog + user's researched tools
   - POST   /api/tools/research                 — LLM-research a free-form tool name and cache
   - DELETE /api/tools/cache/{name}             — remove a researched tool from the cache
-  - GET    /api/roles                          — available role registry entries
+  - GET    /api/roles                          — seeded roles plus this user's researched roles
+  - POST   /api/roles/research                 — LLM-research a free-form job role and cache
+  - DELETE /api/roles/cache/{role_id}          — remove a researched role from the cache
   - GET    /api/preferences                    — current user's stored preferences
   - PUT    /api/preferences/role               — set the user's selected role
   - POST   /api/enablement                     — run Enablement agent → EnablementPlan
@@ -12,6 +14,10 @@ Endpoints:
   - GET    /api/workflows                      — list this user's persisted workflows
   - DELETE /api/workflows/{role_id}            — remove one workflow
   - POST   /api/run-workflow                   — execute a request through the interpreter
+  - GET    /api/stacks/{role_id}               — declared tool names for a role
+  - GET    /api/outcomes                       — recent measured workflow runs for this user
+  - GET    /api/outcomes/summary               — success and real-call rates per recommendation
+  - POST   /api/rollback                       — uninstall the workflow for one recommendation
   - POST   /api/generate-orchestrator          — (LEGACY 1.4) 4-stage codegen pipeline
   - POST   /api/run-orchestrator               — (LEGACY 1.4) run codegen-produced orchestrator
   - GET    /api/saved-recommendations          — list user's saved-for-later recs
@@ -39,8 +45,10 @@ from __future__ import annotations
 
 import logging
 import os
+import uuid
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 # Verbose claude-agent-sdk logging when debugging the live path. Off by
 # default — flip on with ENABLE_AI_UI_DEBUG=true in .env.
@@ -53,12 +61,13 @@ if os.environ.get("ENABLE_AI_UI_DEBUG", "false").strip().lower() in {
     logging.basicConfig(level=logging.DEBUG)
     logging.getLogger("claude_agent_sdk").setLevel(logging.DEBUG)
 
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-
 import importlib.util
 import inspect
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
+from pydantic import BaseModel, Field
 
 from coordinator.schemas import EnablementPlan, Recommendation
 from core.credentials import (
@@ -66,15 +75,36 @@ from core.credentials import (
     credentials_in_env,
 )
 from core.identity import UserContext, local_user
+from core.jev import label_escalation
+from core.outcomes import (
+    OutcomeRecord,
+    OutcomeStatus,
+    RecommendationMetrics,
+    RollbackError,
+    StepSummary,
+    list_outcomes,
+    recommendation_metrics,
+    record_outcome,
+    rollback_recommendation,
+    step_summaries_from_trace,
+)
 from core.preferences import Preferences, get_preferences, set_selected_role
-from core.roles import Role, list_roles, load_role
+from core.role_catalog import (
+    delete_cached_role,
+    list_available_roles,
+    load_role_for_user,
+    normalize_role_id,
+)
+from core.roles import Role
 from core.saved_recommendations import (
     SavedRecommendation,
     list_saved,
     remove_saved,
     save_recommendation,
 )
+from core.stacks import StackNotFoundError, declared_tool_names
 from core.state import orchestrator_path
+from core.telemetry import track_workflow_run
 from core.tool_catalog import (
     ToolCapability,
     delete_cached_tool,
@@ -83,6 +113,7 @@ from core.tool_catalog import (
     load_tool,
     normalize_name,
 )
+from core.tool_credentials import keys_for_tools, keys_for_workflow, missing_keys
 from core.workflow import WorkflowDefinition
 from core.workflow_storage import (
     delete_workflow,
@@ -90,23 +121,30 @@ from core.workflow_storage import (
     load_workflow,
     save_workflow,
 )
+from enablement_agents.generator.artifacts import BuildResult
+from enablement_agents.generator.consolidation_pipeline import (
+    build_consolidation_plan,
+)
+from enablement_agents.generator.demo_install import (
+    install_demo_consolidation,
+    install_demo_native_setup,
+    install_demo_workflow,
+)
+from enablement_agents.generator.native_ai_pipeline import build_native_ai_setup
 from enablement_agents.generator.pipeline import run_pipeline
 from enablement_agents.generator.schemas import (
     GeneratorContext,
     GeneratorRunResult,
 )
-from enablement_agents.generator.artifacts import BuildResult
-from enablement_agents.generator.consolidation_pipeline import (
-    build_consolidation_plan,
-)
-from enablement_agents.generator.native_ai_pipeline import build_native_ai_setup
 from enablement_agents.generator.workflow_pipeline import build_workflow
+from enablement_agents.role_research import research_role
 from enablement_agents.tool_research import research_tool
 from enablement_agents.workflow_interpreter import (
     WorkflowRunResult,
     run_workflow,
 )
 from ui.api.live_runner import run_live_plan
+from ui.api.speech import SpeechUnavailable, resolve_speech_key, synthesize
 from ui.api.synthetic import build_synthetic_plan
 
 logger = logging.getLogger("ui.api.server")
@@ -245,6 +283,14 @@ def _mask(value: str) -> str:
     return "•" * 8 + value[-4:]
 
 
+def _resolve_role(user: UserContext, role_id: str) -> Role:
+    """Seeded role, or this user's researched role. Seeded ids win."""
+    try:
+        return load_role_for_user(user, role_id)
+    except KeyError:
+        raise HTTPException(400, f"Unknown role: {role_id}") from None
+
+
 def _to_tool_summary(cap: ToolCapability) -> ToolSummary:
     return ToolSummary(
         name=cap.canonical_name,
@@ -263,12 +309,16 @@ def _to_tool_summary(cap: ToolCapability) -> ToolSummary:
 # ---------------------------------------------------------------------------
 
 
+_BOOT_ID = uuid.uuid4().hex
+
+
 @app.get("/api/health")
 async def health() -> dict[str, Any]:
     return {
         "ok": True,
         "demo_mode": _demo_mode(),
         "has_anthropic_key": bool(os.environ.get("ANTHROPIC_API_KEY")),
+        "boot_id": _BOOT_ID,
     }
 
 
@@ -326,10 +376,7 @@ async def run_enablement(req: EnablementRequest) -> EnablementResponse:
         )
 
     role_id = req.role or get_preferences(user).selected_role
-    try:
-        role = load_role(role_id)
-    except KeyError:
-        raise HTTPException(400, f"Unknown role: {role_id}") from None
+    role = _resolve_role(user, role_id)
 
     if _demo_mode():
         logger.info(
@@ -376,6 +423,13 @@ class RoleSummary(BaseModel):
     department: str
     description: str
     capabilities: list[str]
+    source: Literal["seed", "researched"] = "seed"
+
+
+class ResearchRoleRequest(BaseModel):
+    """Body for POST /api/roles/research. Free-form job title."""
+
+    name: str = Field(min_length=1, max_length=120)
 
 
 class SetRoleRequest(BaseModel):
@@ -391,13 +445,46 @@ def _role_to_summary(role: Role) -> RoleSummary:
         department=role.department,
         description=role.description,
         capabilities=list(role.capabilities),
+        source=role.source,
     )
 
 
 @app.get("/api/roles", response_model=list[RoleSummary])
 async def get_roles() -> list[RoleSummary]:
-    """Return every role available in the registry."""
-    return [_role_to_summary(r) for r in list_roles()]
+    """Return seeded roles plus this user's researched roles.
+
+    Seeded roles win when a researched id collides with the on-disk registry.
+    """
+    return [_role_to_summary(r) for r in list_available_roles(_current_user())]
+
+
+@app.post("/api/roles/research", response_model=RoleSummary)
+async def research_new_role(req: ResearchRoleRequest) -> RoleSummary:
+    """LLM-research a free-form job role and cache the capability card.
+
+    Researched roles live in `agent-state/<user_id>/role_cache/<id>.json`.
+    A repeat call for the same name overwrites the cached card.
+    """
+    user = _current_user()
+    try:
+        normalize_role_id(req.name)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+    try:
+        role = await research_role(req.name, user)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return _role_to_summary(role)
+
+
+@app.delete("/api/roles/cache/{role_id}")
+async def delete_researched_role(role_id: str) -> dict[str, bool]:
+    """Remove a researched role from the user's cache. Seed roles stay on disk."""
+    removed = delete_cached_role(_current_user(), role_id)
+    return {"removed": removed}
 
 
 @app.get("/api/preferences", response_model=Preferences)
@@ -408,12 +495,10 @@ async def get_user_preferences() -> Preferences:
 
 @app.put("/api/preferences/role", response_model=Preferences)
 async def set_user_role(req: SetRoleRequest) -> Preferences:
-    """Persist the user's selected role. Validates against the registry."""
-    try:
-        load_role(req.role)
-    except KeyError:
-        raise HTTPException(400, f"Unknown role: {req.role}") from None
-    return set_selected_role(_current_user(), req.role)
+    """Persist the user's selected role. Seeded and researched roles are valid."""
+    user = _current_user()
+    _resolve_role(user, req.role)
+    return set_selected_role(user, req.role)
 
 
 # ---------------------------------------------------------------------------
@@ -518,10 +603,7 @@ async def generate_orchestrator(
     """
     user = _current_user()
     role_id = req.role or get_preferences(user).selected_role
-    try:
-        role = load_role(role_id)
-    except KeyError:
-        raise HTTPException(400, f"Unknown role: {role_id}") from None
+    role = _resolve_role(user, role_id)
 
     # Resolve the selected recommendation
     rec: Recommendation | None = None
@@ -663,10 +745,7 @@ async def build_workflow_endpoint(
     """
     user = _current_user()
     role_id = req.role or get_preferences(user).selected_role
-    try:
-        role = load_role(role_id)
-    except KeyError:
-        raise HTTPException(400, f"Unknown role: {role_id}") from None
+    role = _resolve_role(user, role_id)
 
     rec: Recommendation | None = None
     for candidate in req.plan.recommendations:
@@ -720,7 +799,19 @@ async def build_workflow_endpoint(
     # configuration / migration artifacts the user acts on themselves.
     with credentials_in_env(store):
         try:
-            if rec.kind in ("orchestrate", "augment_with_custom_ai"):
+            if _demo_mode():
+                if rec.kind in ("orchestrate", "augment_with_custom_ai"):
+                    result = install_demo_workflow(ctx)
+                elif rec.kind == "use_native_ai":
+                    result = install_demo_native_setup(ctx)
+                elif rec.kind == "consolidate":
+                    result = install_demo_consolidation(ctx)
+                else:
+                    raise HTTPException(
+                        400,
+                        f"Unknown recommendation kind: {rec.kind!r}",
+                    )
+            elif rec.kind in ("orchestrate", "augment_with_custom_ai"):
                 result = await build_workflow(user, ctx)
             elif rec.kind == "use_native_ai":
                 result = await build_native_ai_setup(ctx)
@@ -792,15 +883,129 @@ async def run_workflow_endpoint(req: RunWorkflowRequest) -> WorkflowRunResult:
             "recommendation and click 'Build workflow' first.",
         )
     store = LocalFileCredentialStore(user)
+    started_at = datetime.now(UTC)
+    rec_id = getattr(definition, "recommendation_id", None)
     with credentials_in_env(store):
         try:
-            return await run_workflow(definition, req.payload, store)
+            result = await run_workflow(definition, req.payload, store)
         except Exception as exc:  # noqa: BLE001
             logger.exception("run_workflow failed")
+            _persist_outcome(
+                user,
+                role_id=role_id,
+                recommendation_id=rec_id,
+                status="failed",
+                started_at=started_at,
+                error=f"{type(exc).__name__}: {exc}",
+            )
             raise HTTPException(
                 status_code=502,
                 detail=f"Workflow run failed: {type(exc).__name__}: {exc}",
             ) from exc
+    _persist_outcome(
+        user,
+        role_id=role_id,
+        recommendation_id=rec_id,
+        status="ok" if result.ok else "failed",
+        started_at=started_at,
+        step_summaries=step_summaries_from_trace(result.trace),
+        error=result.error,
+        payload=req.payload,
+        output=result.output,
+    )
+    return result
+
+
+def _persist_outcome(
+    user: UserContext,
+    *,
+    role_id: str,
+    recommendation_id: str | None,
+    status: OutcomeStatus,
+    started_at: datetime,
+    error: str | None = None,
+    step_summaries: list[StepSummary] | None = None,
+    payload: dict[str, Any] | None = None,
+    output: dict[str, Any] | None = None,
+) -> None:
+    """Best-effort Measure write. Must never change the HTTP status of the run."""
+    try:
+        scored = label_escalation(payload, output, LocalFileCredentialStore(user))
+        record_outcome(
+            user,
+            role_id=role_id,
+            recommendation_id=recommendation_id,
+            status=status,
+            started_at=started_at,
+            finished_at=datetime.now(UTC),
+            step_summaries=step_summaries,
+            error=error,
+            escalated=bool(scored["escalate"]) if payload or output else None,
+            escalation_mode=scored["mode"] if payload or output else None,
+            escalation_source=scored["source"] if payload or output else None,
+        )
+        track_workflow_run(
+            role_id=role_id,
+            recommendation_id=recommendation_id,
+            status=status,
+            sdk_key=LocalFileCredentialStore(user).get("LAUNCHDARKLY_SDK_KEY"),
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("failed to persist workflow outcome")
+
+
+class DeclaredStackResponse(BaseModel):
+    """Tool names from `stacks/<department>.yaml` for one role."""
+
+    role_id: str
+    tools: list[str]
+
+
+@app.get("/api/stacks/{role_id}", response_model=DeclaredStackResponse)
+async def get_declared_stack(role_id: str) -> DeclaredStackResponse:
+    """Return the role's declared stack so the UI can select those tools."""
+    try:
+        tools = declared_tool_names(role_id)
+    except KeyError:
+        raise HTTPException(404, f"Unknown role: {role_id}") from None
+    except StackNotFoundError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(500, str(exc)) from exc
+    return DeclaredStackResponse(role_id=role_id, tools=tools)
+
+
+@app.get("/api/outcomes", response_model=list[OutcomeRecord])
+async def get_outcomes() -> list[OutcomeRecord]:
+    """Return recent measured workflow runs for the current user, newest first."""
+    return list_outcomes(_current_user())
+
+
+@app.get("/api/outcomes/summary", response_model=list[RecommendationMetrics])
+async def get_outcome_summary() -> list[RecommendationMetrics]:
+    """Success, error, and real-vs-stub rates per installed recommendation."""
+    return recommendation_metrics(_current_user())
+
+
+class RollbackRequest(BaseModel):
+    """Body for POST /api/rollback."""
+
+    recommendation_id: str = Field(min_length=1)
+    role: str | None = Field(
+        default=None,
+        description="Optional role override; falls back to user preference.",
+    )
+
+
+@app.post("/api/rollback", response_model=OutcomeRecord)
+async def rollback_endpoint(req: RollbackRequest) -> OutcomeRecord:
+    """Uninstall the workflow that was built from this recommendation."""
+    user = _current_user()
+    role_id = req.role or get_preferences(user).selected_role
+    try:
+        return rollback_recommendation(user, role_id, req.recommendation_id)
+    except RollbackError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -842,6 +1047,66 @@ class CredentialRevealResponse(BaseModel):
 
     key: str
     value: str
+
+
+class RequiredCredentialsResponse(BaseModel):
+    """Keys the selected tools need, and which of them are not in the vault yet."""
+
+    required: list[dict[str, str]]
+    missing: list[str]
+
+
+class SpeechRequest(BaseModel):
+    """Text to read aloud with a natural voice."""
+
+    text: str = Field(min_length=1, max_length=4000)
+
+
+@app.post("/api/speech")
+async def speak(req: SpeechRequest) -> Response:
+    """MP3 for plan text. 503 when OPENAI_API_KEY is absent or the call fails."""
+    key = resolve_speech_key(LocalFileCredentialStore(_current_user()))
+    if not key:
+        raise HTTPException(
+            503,
+            "OPENAI_API_KEY is not set. Add it in Settings for a natural voice.",
+        )
+    try:
+        audio = synthesize(req.text, key)
+    except SpeechUnavailable as exc:
+        raise HTTPException(503, str(exc)) from exc
+    return Response(content=audio, media_type="audio/mpeg")
+
+
+@app.get("/api/credentials/for-workflow", response_model=RequiredCredentialsResponse)
+async def workflow_credentials(role: str | None = None) -> RequiredCredentialsResponse:
+    """Keys the built workflow will read, and which are still missing."""
+    user = _current_user()
+    role_id = role or get_preferences(user).selected_role
+    definition = load_workflow(user, role_id)
+    if definition is None:
+        return RequiredCredentialsResponse(required=[], missing=[])
+    pairs = keys_for_workflow(
+        [step.tool for step in definition.steps],
+        list(definition.env_vars_required),
+    )
+    present = set(LocalFileCredentialStore(user).list_keys())
+    return RequiredCredentialsResponse(
+        required=[{"tool": source, "key": key} for source, key in pairs],
+        missing=[key for _source, key in pairs if key not in present],
+    )
+
+
+@app.get("/api/credentials/required", response_model=RequiredCredentialsResponse)
+async def required_credentials(tools: str = "") -> RequiredCredentialsResponse:
+    """Keys for a comma-separated tool list, checked against the vault."""
+    names = [part.strip() for part in tools.split(",") if part.strip()]
+    user = _current_user()
+    present = set(LocalFileCredentialStore(user).list_keys())
+    return RequiredCredentialsResponse(
+        required=[{"tool": tool, "key": key} for tool, key in keys_for_tools(names)],
+        missing=missing_keys(names, present),
+    )
 
 
 @app.get("/api/credentials", response_model=list[CredentialSummary])
