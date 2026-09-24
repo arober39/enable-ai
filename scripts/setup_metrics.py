@@ -109,12 +109,10 @@ def _api_headers(api_key: str) -> dict[str, str]:
     }
 
 
-def _metric_exists(
-    client: httpx.Client, project_key: str, metric_key: str, api_key: str
-) -> bool:
+def _metric_exists(client: httpx.Client, project_key: str, metric_key: str, api_key: str) -> bool:
     """Return True if the metric is already provisioned in the project."""
     resp = client.get(
-        f"{_LD_API_BASE}/projects/{project_key}/metrics/{metric_key}",
+        f"{_LD_API_BASE}/metrics/{project_key}/{metric_key}",
         headers=_api_headers(api_key),
     )
     if resp.status_code == 404:
@@ -122,26 +120,25 @@ def _metric_exists(
     if resp.status_code == 200:
         return True
     raise RuntimeError(
-        f"Unexpected status {resp.status_code} checking metric '{metric_key}': "
-        f"{resp.text[:300]}"
+        f"Unexpected status {resp.status_code} checking metric '{metric_key}': {resp.text[:300]}"
     )
 
 
-def _create_metric(
-    client: httpx.Client, project_key: str, spec: MetricSpec, api_key: str
-) -> None:
-    """Create one metric. Raises on non-success."""
+def _create_metric(client: httpx.Client, project_key: str, spec: MetricSpec, api_key: str) -> None:
+    """Create one metric. Raises on non-success.
+
+    Path is ``/api/v2/metrics/{project}``, not ``/api/v2/projects/{project}/metrics``.
+    """
     payload = _metric_payload(spec)
     resp = client.post(
-        f"{_LD_API_BASE}/projects/{project_key}/metrics",
+        f"{_LD_API_BASE}/metrics/{project_key}",
         headers=_api_headers(api_key),
         json=payload,
     )
     if resp.status_code in (200, 201):
         return
     raise RuntimeError(
-        f"Failed to create metric '{spec.key}': status={resp.status_code} "
-        f"body={resp.text[:500]}"
+        f"Failed to create metric '{spec.key}': status={resp.status_code} body={resp.text[:500]}"
     )
 
 
@@ -205,9 +202,7 @@ def run(*, dry_run: bool) -> int:
         logger.error("HTTP error talking to LaunchDarkly: %s", exc)
         return 2
 
-    logger.info(
-        "Done. created=%d skipped=%d total=%d", created, skipped, len(_METRICS)
-    )
+    logger.info("Done. created=%d skipped=%d total=%d", created, skipped, len(_METRICS))
     return 0
 
 
