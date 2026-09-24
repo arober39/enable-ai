@@ -230,16 +230,61 @@ export interface ApiErrorBody {
 
 // ----- Role registry + user preferences -----
 
+export type RoleSource = "seed" | "researched";
+
 export interface RoleSummary {
   id: string;
   display_name: string;
   department: string;
   description: string;
   capabilities: string[];
+  source?: RoleSource;
 }
 
 export interface UserPreferences {
   selected_role: string;
+}
+
+export interface OutcomeStepSummary {
+  tool: string;
+  action: string;
+  mode: string | null;
+  ok: boolean;
+  error: string | null;
+}
+
+export interface DeclaredStack {
+  role_id: string;
+  tools: string[];
+}
+
+export interface RecommendationMetrics {
+  role_id: string;
+  recommendation_id: string | null;
+  runs: number;
+  successes: number;
+  failures: number;
+  rollbacks: number;
+  success_rate: number;
+  error_rate: number;
+  real_steps: number;
+  stub_steps: number;
+  real_call_rate: number;
+  escalation_rate: number;
+  installed: boolean;
+}
+
+export interface OutcomeRecord {
+  id: string;
+  user_id: string;
+  role_id: string;
+  recommendation_id: string | null;
+  status: "ok" | "failed" | "rolled_back";
+  started_at: string;
+  finished_at: string;
+  duration_ms: number;
+  step_summaries: OutcomeStepSummary[];
+  error: string | null;
 }
 
 // ----- Credential vault (UI-managed, Convex-style) -----
@@ -247,6 +292,16 @@ export interface UserPreferences {
 export interface CredentialSummary {
   key: string;
   masked_value: string;
+}
+
+export interface RequiredCredential {
+  tool: string;
+  key: string;
+}
+
+export interface RequiredCredentials {
+  required: RequiredCredential[];
+  missing: string[];
 }
 
 export interface CredentialRevealResponse {
