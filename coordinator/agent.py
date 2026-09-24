@@ -60,13 +60,14 @@ def _register_subagents() -> dict[str, AgentDefinition]:
     `Task`. Each value is the AgentDefinition the SDK uses to run that
     subagent in isolated context.
 
-    Phase 4.6: Support Enablement Agent registered.
+    Every role under `enablement_agents/roles/` is registered as
+    `{role.id}_enablement_agent` via the shared factory. Support is
+    included as `support_enablement_agent` so existing Task names keep
+    working. Adding a role directory is enough — no Coordinator edit.
     """
-    from enablement_agents.support.definition import (
-        SUPPORT_AGENT_NAME,
-        support_enablement_agent,
-    )
-    return {SUPPORT_AGENT_NAME: support_enablement_agent}
+    from enablement_agents.role_agent import register_role_agents
+
+    return register_role_agents()
 
 
 def _build_hooks() -> dict[HookEvent, list[HookMatcher]]:
@@ -181,7 +182,9 @@ async def run_coordinator(request: str) -> CoordinatorRunResult:
     # (by name); but the actual server instances must live on the parent
     # ClaudeAgentOptions.mcp_servers dict.
     mcp_servers = {_COORDINATOR_MCP_SERVER_NAME: submit_server}
-    # Phase 4.6: support agent needs lookup_tool_capability.
+    # Every role enablement agent shares lookup_tool_capability. The
+    # server keeps the historical "support" name so the qualified tool
+    # (`mcp__support__lookup_tool_capability`) stays stable.
     from enablement_agents.support.tools import (  # local import to avoid cycle
         SUPPORT_MCP_SERVER_NAME,
         build_support_mcp_server,
@@ -195,6 +198,9 @@ async def run_coordinator(request: str) -> CoordinatorRunResult:
         hooks=_build_hooks(),
         agents=_register_subagents(),
         cwd=str(_REPO_ROOT),
+        # Pin a shipped model. User-level Claude settings can carry a broken
+        # default (e.g. `fable[1m]`) that makes the bundled CLI fail immediately.
+        model="claude-sonnet-4-6",
     )
 
     coordinator_session_id: str | None = None
