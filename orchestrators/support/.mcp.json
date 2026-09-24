@@ -8,6 +8,24 @@
       "env": {
         "INTERCOM_API_KEY": "${INTERCOM_API_KEY}"
       }
+    },
+    "slack": {
+      "command": "npx",
+      "args": [
+        "@modelcontextprotocol/server-slack"
+      ],
+      "env": {
+        "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}"
+      }
+    },
+    "zendesk": {
+      "command": "npx",
+      "args": [
+        "mcp-server-zendesk"
+      ],
+      "env": {
+        "ZENDESK_API_TOKEN": "${ZENDESK_API_TOKEN}"
+      }
     }
   }
 }
