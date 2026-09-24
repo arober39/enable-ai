@@ -326,6 +326,26 @@ export function rollbackRecommendation(
   });
 }
 
+export type GrokbotHandoffText = {
+  name: string;
+  title: string;
+  description: string;
+};
+
+export function fetchGrokbotHandoff(args: {
+  recommendation_id: string;
+  kind: string;
+  description: string;
+  notes: string | null;
+  role_name: string;
+  tools: string[];
+}): Promise<GrokbotHandoffText> {
+  return fetchJson<GrokbotHandoffText>("/api/grokbot/handoff", {
+    method: "POST",
+    body: JSON.stringify(args),
+  });
+}
+
 export function listWorkflows(): Promise<WorkflowDefinition[]> {
   return fetchJson<WorkflowDefinition[]>("/api/workflows");
 }

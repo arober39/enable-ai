@@ -18,6 +18,7 @@ Endpoints:
   - GET    /api/outcomes                       — recent measured workflow runs for this user
   - GET    /api/outcomes/summary               — success and real-call rates per recommendation
   - POST   /api/rollback                       — uninstall the workflow for one recommendation
+  - POST   /api/grokbot/handoff               — copy-paste Grok Bot name, title, and assignment
   - POST   /api/generate-orchestrator          — (LEGACY 1.4) 4-stage codegen pipeline
   - POST   /api/run-orchestrator               — (LEGACY 1.4) run codegen-produced orchestrator
   - GET    /api/saved-recommendations          — list user's saved-for-later recs
@@ -74,6 +75,7 @@ from core.credentials import (
     LocalFileCredentialStore,
     credentials_in_env,
 )
+from core.grokbot import GrokbotHandoff, build_handoff
 from core.identity import UserContext, local_user
 from core.jev import label_escalation
 from core.outcomes import (
@@ -855,6 +857,33 @@ async def get_workflows() -> list[WorkflowDefinition]:
 async def delete_workflow_endpoint(role_id: str) -> dict[str, bool]:
     """Remove the workflow for a role."""
     return {"removed": delete_workflow(_current_user(), role_id)}
+
+
+class GrokbotHandoffRequest(BaseModel):
+    """Fields for a copy-paste Grok Bot assignment. Nothing is sent to Grok Bot."""
+
+    recommendation_id: str = Field(min_length=1)
+    kind: str = Field(min_length=1)
+    description: str = Field(min_length=1)
+    notes: str | None = None
+    role_name: str = Field(min_length=1)
+    tools: list[str] = Field(default_factory=list)
+
+
+@app.post("/api/grokbot/handoff", response_model=GrokbotHandoff)
+async def grokbot_handoff(req: GrokbotHandoffRequest) -> GrokbotHandoff:
+    """Draft the bot name, title, and assignment for the user to paste.
+
+    Does not call the Grok Bot gateway, Jev, listAgents, createAgent, or updateAgent.
+    """
+    return build_handoff(
+        recommendation_id=req.recommendation_id,
+        kind=req.kind,
+        description=req.description,
+        notes=req.notes,
+        role_name=req.role_name,
+        tools=req.tools,
+    )
 
 
 class RunWorkflowRequest(BaseModel):

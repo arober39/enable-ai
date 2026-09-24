@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import BuildOrchestrator from "./components/BuildOrchestrator";
 import CredentialGate from "./components/CredentialGate";
+import GrokbotHandoff from "./components/GrokbotHandoff";
 import LoadingPanel from "./components/LoadingPanel";
 import PlanDisplay from "./components/PlanDisplay";
 import RolePicker from "./components/RolePicker";
@@ -59,6 +60,9 @@ export default function Home() {
   // persisted workflow's sample_request.
   const [buildVersion, setBuildVersion] = useState(0);
   const [keysReady, setKeysReady] = useState(false);
+  const [selectedRecommendationId, setSelectedRecommendationId] = useState<
+    string | null
+  >(null);
 
   const handleBuilt = (kind: ArtifactKind | null) => {
     setLastArtifactKind(kind);
@@ -94,6 +98,7 @@ export default function Home() {
         setKeysReady(saved.keysReady);
         setLastArtifactKind(saved.lastArtifactKind);
         setBuildVersion(saved.buildVersion);
+        setSelectedRecommendationId(saved.selectedRecommendationId ?? null);
       })
       .catch(() => setHealth(null))
       .finally(() => setSessionReady(true));
@@ -129,6 +134,7 @@ export default function Home() {
       keysReady,
       lastArtifactKind,
       buildVersion,
+      selectedRecommendationId,
     };
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(payload));
     writePendingTools(result && !keysReady ? Array.from(selected) : []);
@@ -141,6 +147,7 @@ export default function Home() {
     keysReady,
     lastArtifactKind,
     buildVersion,
+    selectedRecommendationId,
   ]);
 
   useEffect(() => {
@@ -187,6 +194,7 @@ export default function Home() {
     setKeysReady(false);
     setLastArtifactKind(null);
     setBuildVersion(0);
+    setSelectedRecommendationId(null);
   };
 
   const onRoleChange = (roleId: string) => {
@@ -250,6 +258,7 @@ export default function Home() {
     setError(null);
     setResult(null);
     setKeysReady(false);
+    setSelectedRecommendationId(null);
     try {
       const resp = await runEnablement(
         Array.from(selected),
@@ -262,6 +271,15 @@ export default function Home() {
       setLoading(false);
     }
   };
+
+  const pickedRecommendation =
+    result?.plan.recommendations.find((rec) => rec.id === selectedRecommendationId) ??
+    result?.plan.recommendations[0] ??
+    null;
+  const roleName =
+    roles.find((role) => role.id === selectedRole)?.display_name ??
+    selectedRole ??
+    "Enable AI";
 
   return (
     <main className="space-y-8">
@@ -400,15 +418,28 @@ export default function Home() {
             plan={result.plan}
             roleId={selectedRole}
             selectedTools={Array.from(selected)}
+            selectedRecommendationId={pickedRecommendation?.id ?? null}
+            onSelectRecommendation={setSelectedRecommendationId}
             onSaved={refreshSaved}
             onBuilt={handleBuilt}
           />
         </section>
       )}
 
+      {result && !loading && selectedRole && keysReady && pickedRecommendation && (
+        <section>
+          <h2 className="mb-3 text-base font-semibold">7. Hand this to Grokbot</h2>
+          <GrokbotHandoff
+            recommendation={pickedRecommendation}
+            roleName={roleName}
+            tools={Array.from(selected)}
+          />
+        </section>
+      )}
+
       {result && !loading && lastArtifactKind === "workflow" && (
         <section>
-          <h2 className="mb-3 text-base font-semibold">7. Send an inquiry</h2>
+          <h2 className="mb-3 text-base font-semibold">8. Send an inquiry</h2>
           <p className="mb-3 text-xs text-neutral-500">
             Shown only because the most recent build produced a runtime
             workflow. If you build a setup guide or migration plan next,

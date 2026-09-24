@@ -12,6 +12,7 @@ export type HomeSession = {
   keysReady: boolean;
   lastArtifactKind: ArtifactKind | null;
   buildVersion: number;
+  selectedRecommendationId?: string | null;
 };
 
 export function writePendingKeys(keys: string[]): void {
