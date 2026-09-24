@@ -1,0 +1,10 @@
+tool: marketo
+mcp_server:
+  available: false
+  origin: null
+  maintained_by: null
+  url: null
+  install: null
+  tools_exposed: []
+fallback_if_unavailable: direct_api
+notes: "No vendor-maintained or mature community MCP server at time of writing. Marketo's REST API is the fallback. Scope a generated stub to get_lead, get_program, get_score — token auth and strict rate limits make a thin stub safer than assuming an MCP exists."

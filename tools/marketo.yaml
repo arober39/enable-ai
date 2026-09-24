@@ -1,0 +1,25 @@
+canonical_name: marketo
+vendor: Adobe Marketo Engage
+categories: [marketing_automation, lead_scoring, campaign_management]
+native_ai_features:
+  - name: Predictive lead scoring
+    description: Adobe Sensei-backed scores from Marketo activity (opens, clicks, form fills). Does not natively include product-usage or support-ticket signals.
+    maturity: ga
+    coverage: medium
+  - name: Adobe GenStudio assist
+    description: In-product content assist for emails and landing pages via Adobe's generative stack; drafts stay in the Marketo/Adobe surface.
+    maturity: ga
+    coverage: low
+  - name: Attribution insights
+    description: Multi-touch reports on channels Marketo can see; last-touch bias remains a common configuration default.
+    maturity: ga
+    coverage: low
+api_surface:
+  has_rest_api: true
+  has_webhooks: true
+  rate_limits: strict
+integration_patterns:
+  - augment_with_custom_ai
+  - orchestrate_into_unified_surface
+  - consolidate
+notes: "Marketo's native AI is in-product scoring and Adobe-stack content assist, not a standalone reasoning engine. It overlaps HubSpot on marketing automation and lead scoring — a likely consolidate candidate — while its campaign and scoring objects are still useful inputs to a custom orchestrator that can join first-party booking and CRM identity Marketo cannot see."

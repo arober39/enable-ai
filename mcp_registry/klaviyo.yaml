@@ -1,0 +1,10 @@
+tool: klaviyo
+mcp_server:
+  available: false
+  origin: null
+  maintained_by: null
+  url: null
+  install: null
+  tools_exposed: []
+fallback_if_unavailable: direct_api
+notes: "No vendor-maintained MCP server confirmed for orchestrator use at time of writing. Fall back to Klaviyo's REST API. A generated stub should scope to get_profile, get_lists, get_campaign_metrics — send/write paths stay out of scope until compliance review."

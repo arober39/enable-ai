@@ -1,0 +1,24 @@
+canonical_name: klaviyo
+vendor: Klaviyo
+categories: [email_marketing, lifecycle_marketing, marketing_automation]
+native_ai_features:
+  - name: AI content and subject lines
+    description: In-product drafting for email and SMS subject lines and short body copy, with brand-voice priming inside Klaviyo.
+    maturity: ga
+    coverage: medium
+  - name: Predictive analytics
+    description: Churn, CLV, and likely-to-buy scores computed from Klaviyo engagement and order events — not from CRM or product-usage systems.
+    maturity: ga
+    coverage: medium
+  - name: Segment and flow recommendations
+    description: Suggested segments and flow branches based on list performance; stays inside Klaviyo's own audience model.
+    maturity: ga
+    coverage: low
+api_surface:
+  has_rest_api: true
+  has_webhooks: true
+  rate_limits: standard
+integration_patterns:
+  - augment_with_custom_ai
+  - orchestrate_into_unified_surface
+notes: "Klaviyo's native AI is useful for subject lines and short lifecycle copy but is not an external reasoning engine and cannot see HubSpot deal stage or booking-platform usage. Custom AI adds value when it injects real account context into a flow (plan tier, upcoming event date) rather than replacing Klaviyo as the send engine."
