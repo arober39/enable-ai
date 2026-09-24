@@ -21,18 +21,17 @@ from typing import Any
 
 from anthropic import AsyncAnthropic
 from anthropic.types import ToolUseBlock
-from pydantic import BaseModel, ConfigDict, Field
 
 from core.credentials import runtime_credentials
 from core.identity import UserContext
-from core.tool_catalog import ToolCapability
+from core.tool_credentials import keys_for_workflow
 from core.workflow import WorkflowDefinition, WorkflowStep, referenced_tools
 
+from ..tool_adapters import builtin as _builtin  # noqa: F401 — registers builtins
+from ..tool_adapters.registry import describe_actions
 from .artifacts import BuildResult
 from .pipeline import _stage1_research  # reused from 1.4
 from .schemas import GeneratorContext, StageResult, ToolResearch
-from ..tool_adapters import builtin as _builtin  # noqa: F401 — registers builtins
-from ..tool_adapters.registry import describe_actions
 
 logger = logging.getLogger(__name__)
 
@@ -130,10 +129,13 @@ Hard rules for the steps you emit:
           {"$ref": "steps.search.articles.0.id"}
     (b) String interpolation inside string params: `{{ dotted.path }}`
         — the runtime substitutes the value (json-encoded for dicts/lists).
-        Use this inside `llm` `system`/`user` prompts where you want to
-        inline an earlier step's output as part of a longer instruction.
+        Use `{{ }}` inside `llm` prompts to inline an earlier value.
+        Task instructions belong in `system`. The `user` message is only
+        the data those instructions apply to — request fields and prior
+        step output — not a second copy of the task.
         Example:
-          "user": "Ticket: {{ steps.fetch_ticket }}\\nDecide intent."
+          "system": "Decide the ticket intent. Reply with one label."
+          "user": "Ticket: {{ steps.fetch_ticket }}"
 - For llm steps, the `model` param is OPTIONAL. If you set it, use EXACTLY
   one of: "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5-20251001".
   Otherwise omit the model param and the runtime will pick a sensible
@@ -143,8 +145,10 @@ Hard rules for the steps you emit:
   without it.
 - The LAST step MUST be a `return` step. Its params become the
   workflow's final response.
-- Refer only to env vars listed in `available_credentials`. The
-  generated workflow's `env_vars_required` lists what it actually uses.
+- Do not decide which vault keys the workflow needs. Leave
+  `env_vars_required` empty. The runtime fills that list from the
+  steps: an `llm` step requires ANTHROPIC_API_KEY, and a tool step
+  requires that tool's reviewed credential.
 
 Call `submit_workflow_definition` exactly once.
 """
@@ -216,7 +220,7 @@ Produce a WorkflowDefinition. Field requirements:
 - name: short title for this workflow
 - description: one-paragraph explanation
 - tools_used: every non-special tool referenced in steps
-- env_vars_required: every credential the steps need
+- env_vars_required: []
 - steps: ordered list ending with a `return` step
 - request_schema / response_schema: shape hints (informational)
 - sample_request: a CONCRETE example request the user can paste into the
@@ -269,6 +273,34 @@ Produce a WorkflowDefinition. Field requirements:
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
+
+
+def unknown_adapter_actions(definition: WorkflowDefinition) -> list[str]:
+    """Return `tool.action` pairs that are not in the reviewed adapter catalog.
+
+    Special tools (`llm`, `return`, `set`) are in the catalog too. A
+    workflow that names anything else is not installable — the interpreter
+    would fail at run time on an unreviewed action.
+    """
+    catalog = describe_actions()
+    unknown: list[str] = []
+    for step in definition.steps:
+        actions = catalog.get(step.tool)
+        if actions is None or step.action not in actions:
+            unknown.append(f"{step.tool}.{step.action}")
+    return unknown
+
+
+def stamp_env_vars(definition: WorkflowDefinition) -> WorkflowDefinition:
+    """Set env_vars_required from the steps. Ignores whatever the model wrote."""
+    keys = [
+        key
+        for _source, key in keys_for_workflow(
+            [step.tool for step in definition.steps],
+            [],
+        )
+    ]
+    return definition.model_copy(update={"env_vars_required": keys})
 
 
 def _now() -> datetime:
@@ -325,6 +357,7 @@ async def build_workflow(
     s_start = _now()
     try:
         definition, explanation = await _stage2_emit(ctx, research)
+        definition = stamp_env_vars(definition)
         env_vars = list(definition.env_vars_required)
         # Sanity check: every non-special tool the workflow references must
         # be in `referenced_tools` of the catalog we sent — i.e., the model
@@ -335,6 +368,12 @@ async def build_workflow(
         if unknown:
             raise RuntimeError(
                 f"workflow references tools not in the catalog: {sorted(unknown)}"
+            )
+        unknown_actions = unknown_adapter_actions(definition)
+        if unknown_actions:
+            raise RuntimeError(
+                "workflow references actions with no reviewed adapter: "
+                f"{unknown_actions}"
             )
         # Align sample_request with the keys the steps actually read.
         # The model often writes an aspirational sample that doesn't

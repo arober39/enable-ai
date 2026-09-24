@@ -221,6 +221,9 @@ def test_orchestrator_py_contains_runtime_constants(tmp_path: Path) -> None:
         '"support.error"',
         '"support-orchestrator-config"',
         '"claude-sonnet-4-6"',
+        "track_metrics_of_async",
+        "track_judge_result",
+        "atexit.register",
     ]:
         assert needle in orch, f"orchestrator.py missing constant: {needle}"
 
