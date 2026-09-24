@@ -18,7 +18,7 @@ Endpoints:
   - GET    /api/outcomes                       — recent measured workflow runs for this user
   - GET    /api/outcomes/summary               — success and real-call rates per recommendation
   - POST   /api/rollback                       — uninstall the workflow for one recommendation
-  - POST   /api/grokbot/handoff               — copy-paste Grok Bot name, title, and assignment
+  - POST   /api/grokbot/handoff               — copy-paste Grok Bot text, including Jev's placement
   - POST   /api/generate-orchestrator          — (LEGACY 1.4) 4-stage codegen pipeline
   - POST   /api/run-orchestrator               — (LEGACY 1.4) run codegen-produced orchestrator
   - GET    /api/saved-recommendations          — list user's saved-for-later recs
@@ -75,7 +75,7 @@ from core.credentials import (
     LocalFileCredentialStore,
     credentials_in_env,
 )
-from core.grokbot import GrokbotHandoff, build_handoff
+from core.grokbot import GrokbotHandoff, HandoffCredentials, build_handoff
 from core.identity import UserContext, local_user
 from core.jev import label_escalation
 from core.outcomes import (
@@ -871,11 +871,13 @@ class GrokbotHandoffRequest(BaseModel):
 
 
 @app.post("/api/grokbot/handoff", response_model=GrokbotHandoff)
-async def grokbot_handoff(req: GrokbotHandoffRequest) -> GrokbotHandoff:
-    """Draft the bot name, title, and assignment for the user to paste.
+def grokbot_handoff(req: GrokbotHandoffRequest) -> GrokbotHandoff:
+    """Draft paste text, including where Jev says the bot belongs.
 
-    Does not call the Grok Bot gateway, Jev, listAgents, createAgent, or updateAgent.
+    Does not call createAgent or updateAgent. listAgents runs only when
+    gateway credentials are set, and only to name an existing bot.
     """
+    creds = HandoffCredentials(LocalFileCredentialStore(_current_user()))
     return build_handoff(
         recommendation_id=req.recommendation_id,
         kind=req.kind,
@@ -883,6 +885,7 @@ async def grokbot_handoff(req: GrokbotHandoffRequest) -> GrokbotHandoff:
         notes=req.notes,
         role_name=req.role_name,
         tools=req.tools,
+        creds=creds,
     )
 
 

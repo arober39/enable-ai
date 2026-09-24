@@ -1,33 +1,39 @@
-"""Grok Bot assignment text, plus a future gateway writer.
+"""Copy-paste Grok Bot handoff, with an optional Jev placement.
 
-Step 7 of the Enable AI UI does not call this module's gateway. It shows
-`build_handoff` so the user can paste a name, title, and description into
-Grok Bot (or into a Grok Bot chat). `apply_recommendation` stays for a
-later path that would ask Jev where the bot belongs and then call
-listAgents, createAgent, or updateAgent. That path does not run unless
-something calls it directly.
+Step 7 asks Jev whether the recommendation is a new bot or belongs on an
+existing one, then shows text the user pastes into Grok Bot. It never calls
+createAgent or updateAgent. listAgents runs only when gateway credentials
+are present, and only to name an existing bot. `apply_recommendation` remains
+for a later path that would write the bot itself.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any
+import os
+from pathlib import Path
+from typing import Any, Literal
 from urllib.parse import urlparse
 
 import httpx
+from dotenv import dotenv_values
 from pydantic import BaseModel, ConfigDict, Field
 
 from core.credentials import Credentials
-from core.jev import CHOICE_FLOOR, decide
+from core.jev import CHOICE_FLOOR, JEV_CRED, decide
 
 logger = logging.getLogger(__name__)
 
 URL_KEY = "GROKBOT_GATEWAY_URL"
 TOKEN_KEY = "SAND_GATEWAY_TOKEN"
 _NEW = "new_bot"
+_EXISTING = "existing_bot"
 _NAME_LIMIT = 80
 _TITLE_LIMIT = 80
 _DESCRIPTION_LIMIT = 4000
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+
+PlacementAction = Literal["create", "update", "create_fallback"]
 
 
 class GrokbotHandoff(BaseModel):
@@ -35,13 +41,53 @@ class GrokbotHandoff(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    name: str = Field(description="Suggested bot name.")
+    name: str = Field(description="Bot name to paste, or the existing bot Jev named.")
     title: str = Field(description="Suggested title. Usually the role name.")
     description: str = Field(
         description=(
-            "Assignment the bot should follow. Enable AI does not call the tools named in it."
+            "Jev's placement, then the assignment. Enable AI does not call the tools named in it."
         ),
     )
+    placement: str = Field(description="Plain sentence about where Jev says this work belongs.")
+    action: PlacementAction = Field(
+        description=(
+            "create when Jev chooses a new bot, update when Jev chooses an existing bot, "
+            "create_fallback when Jev did not decide."
+        ),
+    )
+    existing_bot_name: str | None = Field(
+        default=None,
+        description="Name of the existing bot Jev chose, when the roster included it.",
+    )
+
+
+class HandoffCredentials(Credentials):
+    """Settings first, then the process environment, then the repo `.env` file."""
+
+    def __init__(self, store: Credentials) -> None:
+        self._store = store
+
+    def get(self, key: str) -> str | None:
+        stored = self._store.get(key)
+        if stored:
+            return stored
+        env = os.environ.get(key)
+        if env:
+            return env
+        return _file_env().get(key)
+
+
+def _file_env() -> dict[str, str]:
+    """Non-empty values from the repo `.env`. Does not write `os.environ`."""
+    path = _REPO_ROOT / ".env"
+    if not path.is_file():
+        return {}
+    loaded = dotenv_values(path)
+    found: dict[str, str] = {}
+    for key, value in loaded.items():
+        if isinstance(key, str) and isinstance(value, str) and value.strip():
+            found[key] = value
+    return found
 
 
 def assignment_text(
@@ -79,6 +125,46 @@ def _bot_title(role_name: str) -> str:
     return role_name[:_TITLE_LIMIT] or "Enable AI"
 
 
+def _plain_reason(reason: str | None) -> str:
+    if not reason:
+        return "no decision"
+    if reason == "low_confidence":
+        return "low confidence"
+    if reason == f"missing credential: {JEV_CRED}":
+        return f"missing {JEV_CRED} — add it in Settings or .env"
+    return reason
+
+
+def _advice(
+    decision: dict[str, Any],
+    suggested_name: str,
+    title: str,
+    roster: list[dict[str, Any]] | None,
+) -> tuple[str, PlacementAction, str, str, str | None]:
+    """Placement sentence, action, display name, title, and existing bot name."""
+    choice = decision.get("choice")
+    if decision.get("source") == "jev" and choice == _NEW:
+        line = f"Jev recommends: create a new bot named {suggested_name}."
+        return line, "create", suggested_name, title, None
+    if decision.get("source") == "jev" and choice == _EXISTING:
+        line = (
+            "Jev recommends: add this to an existing bot. Pick which bot in Grok Bot."
+        )
+        return line, "update", suggested_name, title, None
+    if decision.get("source") == "jev" and roster:
+        match = next((bot for bot in roster if bot.get("id") == choice), None)
+        if match is not None:
+            bot_name = str(match.get("name") or "bot")
+            bot_title = str(match.get("title") or "") or title
+            line = f"Jev recommends: add this to existing bot {bot_name}."
+            return line, "update", bot_name, bot_title, bot_name
+    line = (
+        f"Jev did not choose a bot ({_plain_reason(decision.get('reason'))}). "
+        f"Create a new bot named {suggested_name}."
+    )
+    return line, "create_fallback", suggested_name, title, None
+
+
 def build_handoff(
     *,
     recommendation_id: str,
@@ -87,22 +173,48 @@ def build_handoff(
     notes: str | None,
     role_name: str,
     tools: list[str],
+    creds: Credentials | None = None,
 ) -> GrokbotHandoff:
     """Name, title, and assignment for the user to paste into Grok Bot.
 
-    This does not read credentials and does not call the gateway.
+    Asks Jev where the work belongs. May call listAgents when gateway
+    credentials exist. Does not call createAgent or updateAgent.
     """
+    suggested = _bot_name(recommendation_id, role_name)
+    title = _bot_title(role_name)
+    body = assignment_text(
+        recommendation_id=recommendation_id,
+        kind=kind,
+        description=description,
+        notes=notes,
+        role_name=role_name,
+        tools=tools,
+    )
+    roster = _roster(creds)
+    decision = _placement(
+        {
+            "id": recommendation_id,
+            "kind": kind,
+            "description": description,
+            "notes": notes,
+        },
+        role_name,
+        roster,
+        creds,
+    )
+    placement, action, name, shown_title, existing_name = _advice(
+        decision,
+        suggested,
+        title,
+        roster,
+    )
     return GrokbotHandoff(
-        name=_bot_name(recommendation_id, role_name),
-        title=_bot_title(role_name),
-        description=assignment_text(
-            recommendation_id=recommendation_id,
-            kind=kind,
-            description=description,
-            notes=notes,
-            role_name=role_name,
-            tools=tools,
-        ),
+        name=name,
+        title=shown_title,
+        description=f"{placement}\n\n{body}",
+        placement=placement,
+        action=action,
+        existing_bot_name=existing_name,
     )
 
 
@@ -183,10 +295,27 @@ def _bot_view(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _roster(creds: Credentials | None) -> list[dict[str, Any]] | None:
+    """Existing bots, or None when the gateway cannot be read.
+
+    Read-only. A missing gateway or a failed listAgents does not invent bots.
+    """
+    gateway = _gateway(creds)
+    if isinstance(gateway, dict):
+        return None
+    base, token = gateway
+    try:
+        listed = _command(base, token, "listAgents", {})
+    except Exception as exc:  # noqa: BLE001 — an unread roster is not a decision
+        logger.info("grokbot listAgents failed: %s", exc)
+        return None
+    return _bots(listed if isinstance(listed, dict) else {"items": listed})
+
+
 def _placement(
     recommendation: dict[str, Any],
     role_name: str,
-    bots: list[dict[str, Any]],
+    bots: list[dict[str, Any]] | None,
     creds: Credentials | None,
 ) -> dict[str, Any]:
     criteria = {
@@ -195,11 +324,17 @@ def _placement(
             "with its own name and description."
         ),
     }
-    for bot in bots:
-        snippet = str(bot.get("description") or "")[:180]
-        criteria[str(bot["id"])] = (
-            f"Add this work to the existing bot {bot.get('name')}. {snippet}"
+    if bots is None:
+        criteria[_EXISTING] = (
+            "Add this work to an existing bot. The user will choose which bot."
         )
+    else:
+        for bot in bots:
+            snippet = str(bot.get("description") or "")[:180]
+            criteria[str(bot["id"])] = (
+                f"Add this work to the existing bot {bot.get('name')}. {snippet}"
+            )
+    known_bots = bots or []
     result = decide(
         {
             "role": role_name,
@@ -207,7 +342,7 @@ def _placement(
             "kind": recommendation.get("kind"),
             "description": recommendation.get("description"),
             "notes": recommendation.get("notes"),
-            "existing_bots": [_bot_view(bot) for bot in bots],
+            "existing_bots": [_bot_view(bot) for bot in known_bots],
         },
         {
             "placement": {

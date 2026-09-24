@@ -118,23 +118,57 @@ export default function GrokbotHandoff({
   };
 
   const toolLabel = tools.length ? tools.join(", ") : "these tools";
+  const updating = handoff?.action === "update";
+  const namedBot = handoff?.existing_bot_name ?? null;
+  const steps =
+    updating && namedBot
+      ? [
+          "Open Grok Bot.",
+          `Edit ${namedBot}.`,
+          "Paste the description into that bot.",
+        ]
+      : updating
+        ? [
+            "Open Grok Bot.",
+            "Choose the existing bot this work belongs on.",
+            "Paste the description into that bot.",
+          ]
+        : [
+            "Open Grok Bot.",
+            "Create a new bot.",
+            "Paste the name, title, and description below.",
+          ];
 
   return (
     <div className="space-y-4 rounded-lg border border-neutral-300 bg-white p-4">
       <p className="text-sm text-neutral-700">
-        Enable AI does not call {toolLabel}. Finish this in Grok Bot: create
-        or update the bot yourself, and that bot does the work.
+        Enable AI does not call {toolLabel}, and it does not create or edit
+        the bot. Finish this in Grok Bot: paste the assignment, and that bot
+        does the work.
       </p>
+      {handoff && (
+        <p
+          className={
+            "rounded-md border px-3 py-2 text-sm " +
+            (handoff.action === "create_fallback"
+              ? "border-amber-300 bg-amber-50 text-amber-950"
+              : "border-sky-200 bg-sky-50 text-sky-950")
+          }
+        >
+          {handoff.placement}
+        </p>
+      )}
       <div>
         <h3 className="text-sm font-semibold text-neutral-900">Next steps</h3>
         <ol className="mt-1 list-decimal space-y-1 pl-5 text-sm text-neutral-700">
-          <li>Open Grok Bot.</li>
-          <li>Create a new bot, or edit an existing one.</li>
-          <li>Paste the name, title, and description below.</li>
+          {steps.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
         </ol>
         <p className="mt-2 text-sm text-neutral-600">
-          You can also paste the description into a Grok Bot chat and ask the
-          assistant to create the teammate.
+          {updating
+            ? "You can also paste the description into a Grok Bot chat and ask the assistant to add this work to that bot."
+            : "You can also paste the description into a Grok Bot chat and ask the assistant to create the teammate."}
         </p>
       </div>
       {loading && (
@@ -150,18 +184,30 @@ export default function GrokbotHandoff({
       )}
       {handoff && (
         <div className="space-y-3">
-          <Field
-            label="Bot name"
-            value={handoff.name}
-            copied={copied === "name"}
-            onCopy={() => onCopy("name", handoff.name)}
-          />
-          <Field
-            label="Title"
-            value={handoff.title}
-            copied={copied === "title"}
-            onCopy={() => onCopy("title", handoff.title)}
-          />
+          {handoff.action !== "update" && (
+            <>
+              <Field
+                label="Bot name"
+                value={handoff.name}
+                copied={copied === "name"}
+                onCopy={() => onCopy("name", handoff.name)}
+              />
+              <Field
+                label="Title"
+                value={handoff.title}
+                copied={copied === "title"}
+                onCopy={() => onCopy("title", handoff.title)}
+              />
+            </>
+          )}
+          {handoff.action === "update" && namedBot && (
+            <Field
+              label="Existing bot"
+              value={namedBot}
+              copied={copied === "name"}
+              onCopy={() => onCopy("name", namedBot)}
+            />
+          )}
           <div className="space-y-1">
             <div className="flex items-center justify-between gap-3">
               <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">

@@ -330,6 +330,9 @@ export type GrokbotHandoffText = {
   name: string;
   title: string;
   description: string;
+  placement: string;
+  action: "create" | "update" | "create_fallback";
+  existing_bot_name: string | null;
 };
 
 export function fetchGrokbotHandoff(args: {
