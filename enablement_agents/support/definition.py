@@ -80,4 +80,5 @@ support_enablement_agent: AgentDefinition = AgentDefinition(
     prompt=SUPPORT_AGENT_SYSTEM_PROMPT,
     tools=[*SUPPORT_AGENT_BASE_TOOLS, *SUPPORT_AGENT_MCP_TOOLS],
     mcpServers=SUPPORT_AGENT_MCP_SERVERS,
+    model="claude-sonnet-4-6",
 )

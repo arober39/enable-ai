@@ -204,6 +204,7 @@ class SupportEnablementAgent(EnablementAgentBase):
             },
             hooks=_build_hooks(),
             cwd=str(_REPO_ROOT),
+            model="claude-sonnet-4-6",
         )
 
         async for message in query(prompt=prompt, options=options):
