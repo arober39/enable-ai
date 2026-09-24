@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import BuildOrchestrator from "./components/BuildOrchestrator";
+import CredentialGate from "./components/CredentialGate";
 import LoadingPanel from "./components/LoadingPanel";
 import PlanDisplay from "./components/PlanDisplay";
 import RolePicker from "./components/RolePicker";
@@ -10,16 +11,26 @@ import SavedRecommendations from "./components/SavedRecommendations";
 import Spinner from "./components/Spinner";
 import ToolPicker from "./components/ToolPicker";
 import {
+  ApiError,
+  deleteCachedRole,
   deleteCachedTool,
   fetchHealth,
+  getDeclaredStack,
   getPreferences,
   listRoles,
   listSavedRecommendations,
   listTools,
+  researchRole,
   researchTool,
   runEnablement,
   setSelectedRole,
 } from "./lib/api";
+import {
+  readSession,
+  SESSION_KEY,
+  writePendingTools,
+  type HomeSession,
+} from "./lib/homeSession";
 import type {
   ArtifactKind,
   EnablementResponse,
@@ -29,6 +40,9 @@ import type {
 } from "./lib/types";
 
 export default function Home() {
+  const skipStackSelect = useRef(false);
+  const planStale = useRef(false);
+  const [sessionReady, setSessionReady] = useState(false);
   const [tools, setTools] = useState<ToolSummary[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [roles, setRoles] = useState<RoleSummary[]>([]);
@@ -44,6 +58,7 @@ export default function Home() {
   // `key` on RunInquiryPanel so it remounts and re-fetches the freshly
   // persisted workflow's sample_request.
   const [buildVersion, setBuildVersion] = useState(0);
+  const [keysReady, setKeysReady] = useState(false);
 
   const handleBuilt = (kind: ArtifactKind | null) => {
     setLastArtifactKind(kind);
@@ -59,31 +74,103 @@ export default function Home() {
   const [health, setHealth] = useState<{
     demo_mode: boolean;
     has_anthropic_key: boolean;
+    boot_id: string;
   } | null>(null);
+  const [catalogReady, setCatalogReady] = useState(false);
 
   useEffect(() => {
-    fetchHealth().then(setHealth).catch(() => setHealth(null));
+    const saved = readSession();
+    fetchHealth()
+      .then((report) => {
+        setHealth(report);
+        if (!saved) return;
+        skipStackSelect.current = true;
+        planStale.current = Boolean(
+          saved.bootId && report.boot_id && saved.bootId !== report.boot_id,
+        );
+        setSelected(new Set(saved.selected));
+        setSelectedRoleState(saved.selectedRole);
+        setResult(saved.result);
+        setKeysReady(saved.keysReady);
+        setLastArtifactKind(saved.lastArtifactKind);
+        setBuildVersion(saved.buildVersion);
+      })
+      .catch(() => setHealth(null))
+      .finally(() => setSessionReady(true));
+  }, []);
+
+  useEffect(() => {
     listTools()
       .then((data) => {
         setTools(data);
-        // Default: pre-select Intercom + Zendesk if they exist in the
-        // catalog (seed tools), so first-time visitors see a non-trivial
-        // plan when they hit Submit.
-        const seeds = new Set(data.map((t) => t.name));
-        const presel = new Set<string>();
-        if (seeds.has("intercom")) presel.add("intercom");
-        if (seeds.has("zendesk")) presel.add("zendesk");
-        setSelected(presel);
+        setCatalogReady(true);
       })
       .catch((e: Error) => setError(e.message));
     Promise.all([listRoles(), getPreferences()])
       .then(([roleList, prefs]) => {
         setRoles(roleList);
-        setSelectedRoleState(prefs.selected_role);
+        setSelectedRoleState((current) => current ?? prefs.selected_role);
       })
       .catch((e: Error) => setError(e.message));
     refreshSaved();
   }, []);
+
+  // Selecting a role selects that department's declared stack. A researched
+  // role with no stack file 404s: clear the tool selection so the user can
+  // type their own tools, and do not surface that 404. Manual toggles after
+  // a successful load stay until the role changes again.
+  useEffect(() => {
+    if (!sessionReady || !health?.boot_id) return;
+    const payload: HomeSession = {
+      bootId: health.boot_id,
+      selected: Array.from(selected),
+      selectedRole,
+      result,
+      keysReady,
+      lastArtifactKind,
+      buildVersion,
+    };
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(payload));
+    writePendingTools(result && !keysReady ? Array.from(selected) : []);
+  }, [
+    sessionReady,
+    health,
+    selected,
+    selectedRole,
+    result,
+    keysReady,
+    lastArtifactKind,
+    buildVersion,
+  ]);
+
+  useEffect(() => {
+    if (!selectedRole || !catalogReady) return;
+    if (skipStackSelect.current) {
+      skipStackSelect.current = false;
+      return;
+    }
+    let cancelled = false;
+    getDeclaredStack(selectedRole)
+      .then((stack) => {
+        if (cancelled) return;
+        const known = new Set(tools.map((tool) => tool.name));
+        setSelected(new Set(stack.tools.filter((name) => known.has(name))));
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        if (e instanceof ApiError && e.status === 404) {
+          setSelected(new Set());
+          return;
+        }
+        setError(e instanceof Error ? e.message : String(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+    // tools is read once the catalog has loaded; later research must not
+    // wipe a user's toggles.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRole, catalogReady]);
 
   const refreshSaved = () => {
     listSavedRecommendations()
@@ -93,7 +180,17 @@ export default function Home() {
       });
   };
 
+  const dropStalePlan = () => {
+    if (!planStale.current) return;
+    planStale.current = false;
+    setResult(null);
+    setKeysReady(false);
+    setLastArtifactKind(null);
+    setBuildVersion(0);
+  };
+
   const onRoleChange = (roleId: string) => {
+    dropStalePlan();
     setSelectedRoleState(roleId);
     // Persist asynchronously; surface failures via the error pane but don't
     // block the optimistic UI update — the picker should feel instant.
@@ -101,6 +198,7 @@ export default function Home() {
   };
 
   const onResearch = async (name: string) => {
+    dropStalePlan();
     const added = await researchTool(name);
     setTools((prev) => {
       const next = prev.filter((t) => t.name !== added.name);
@@ -109,6 +207,22 @@ export default function Home() {
       return next;
     });
     setSelected((prev) => new Set(prev).add(added.name));
+  };
+
+  const onResearchRole = async (name: string) => {
+    const added = await researchRole(name);
+    setRoles((prev) => {
+      const next = prev.filter((r) => r.id !== added.id);
+      next.push(added);
+      return next;
+    });
+    onRoleChange(added.id);
+  };
+
+  const onDeleteCachedRole = async (id: string) => {
+    await deleteCachedRole(id);
+    setRoles((prev) => prev.filter((r) => r.id !== id));
+    setSelectedRoleState((current) => (current === id ? null : current));
   };
 
   const onDeleteCached = async (name: string) => {
@@ -122,6 +236,7 @@ export default function Home() {
   };
 
   const toggle = (name: string) => {
+    dropStalePlan();
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(name)) next.delete(name);
@@ -134,6 +249,7 @@ export default function Home() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setKeysReady(false);
     try {
       const resp = await runEnablement(
         Array.from(selected),
@@ -152,8 +268,9 @@ export default function Home() {
       <header>
         <h1 className="text-2xl font-bold">Enable AI — test UI</h1>
         <p className="mt-1 text-sm text-neutral-600">
-          Pick a role and a stack. The Enablement Agent proposes
-          recommendations; pick one to generate a runnable orchestrator.
+          Pick a role. Its declared stack is selected. The Enablement Agent
+          proposes recommendations; pick one to install a runtime you can
+          run and measure.
         </p>
         {health && (
           <p className="mt-2 text-xs text-neutral-500">
@@ -177,6 +294,8 @@ export default function Home() {
           roles={roles}
           selected={selectedRole}
           onSelect={onRoleChange}
+          onResearch={onResearchRole}
+          onDeleteCached={onDeleteCachedRole}
           disabled={loading}
         />
       </section>
@@ -253,21 +372,29 @@ export default function Home() {
         </section>
       )}
 
-      {result && !loading && selectedRole && (
+      {result && !loading && !keysReady && (
+        <section>
+          <h2 className="mb-3 text-base font-semibold">5. Add credentials</h2>
+          <CredentialGate
+            tools={Array.from(selected)}
+            onConfirmed={() => setKeysReady(true)}
+          />
+        </section>
+      )}
+
+      {result && !loading && selectedRole && keysReady && (
         <section>
           <h2 className="mb-3 text-base font-semibold">
-            5. Pick one recommendation and build
+            6. Pick one recommendation and build
           </h2>
           <p className="mb-3 text-sm text-neutral-700">
-            The LLM-driven 4-stage pipeline writes one{" "}
+            Orchestrate and augment recommendations install a{" "}
             <code className="rounded bg-neutral-100 px-1 py-0.5 font-mono text-xs">
-              orchestrator.py
+              WorkflowDefinition
             </code>{" "}
-            under{" "}
-            <code className="rounded bg-neutral-100 px-1 py-0.5 font-mono text-xs">
-              orchestrators/local/{selectedRole}/
-            </code>
-            . Other recommendations can be parked for later from this list.
+            the interpreter runs. Native-AI recommendations become a setup
+            guide. Consolidations become a migration plan. Other
+            recommendations can be parked for later.
           </p>
           <BuildOrchestrator
             plan={result.plan}
@@ -281,7 +408,7 @@ export default function Home() {
 
       {result && !loading && lastArtifactKind === "workflow" && (
         <section>
-          <h2 className="mb-3 text-base font-semibold">6. Send an inquiry</h2>
+          <h2 className="mb-3 text-base font-semibold">7. Send an inquiry</h2>
           <p className="mb-3 text-xs text-neutral-500">
             Shown only because the most recent build produced a runtime
             workflow. If you build a setup guide or migration plan next,
