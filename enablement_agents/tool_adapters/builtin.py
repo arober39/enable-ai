@@ -16,7 +16,19 @@ from anthropic import AsyncAnthropic
 
 from core.credentials import Credentials
 
+from .discord import adapter as _discord_adapter
+from .discourse import adapter as _discourse_adapter
+from .gainsight import adapter as _gainsight_adapter
+from .github import adapter as _github_adapter
+from .gong import adapter as _gong_adapter
+from .hubspot import adapter as _hubspot_adapter
+from .intercom import adapter as _intercom_adapter
+from .klaviyo import adapter as _klaviyo_adapter
+from .marketo import adapter as _marketo_adapter
 from .registry import ACTION_CATALOG, register
+from .slack import adapter as _slack_adapter
+from .vitally import adapter as _vitally_adapter
+from .zendesk import adapter as _zendesk_adapter
 
 logger = logging.getLogger(__name__)
 
@@ -52,9 +64,7 @@ def _resolve_model(requested: Any) -> str:
     return _DEFAULT_LLM_MODEL
 
 
-async def _llm_adapter(
-    action: str, params: dict[str, Any], creds: Credentials
-) -> dict[str, Any]:
+async def _llm_adapter(action: str, params: dict[str, Any], creds: Credentials) -> dict[str, Any]:
     """Adapter for the `llm` tool — calls Claude.
 
     Supported actions:
@@ -115,9 +125,7 @@ async def _return_adapter(
     return dict(params)
 
 
-async def _set_adapter(
-    action: str, params: dict[str, Any], creds: Credentials
-) -> dict[str, Any]:
+async def _set_adapter(action: str, params: dict[str, Any], creds: Credentials) -> dict[str, Any]:
     """`set` adapter — copies values around the context.
 
     Useful for shape changes: the params (already $ref-resolved by the
@@ -125,47 +133,6 @@ async def _set_adapter(
     where the values land in context.
     """
     return dict(params)
-
-
-# ---------------------------------------------------------------------------
-# Stub adapters for seed catalog tools
-# ---------------------------------------------------------------------------
-
-
-# Intercom's adapter is real (REST) when INTERCOM_API_TOKEN is present;
-# stub fallback when missing. Write actions (send_reply, assign_to_agent)
-# also need INTERCOM_ADMIN_ID. Lives in its own module — see
-# `enablement_agents/tool_adapters/intercom.py`.
-from .intercom import adapter as _intercom_adapter
-
-
-# Zendesk's adapter is real (REST) when creds are present; stub otherwise.
-# Lives in its own module — see `enablement_agents/tool_adapters/zendesk.py`.
-from .zendesk import adapter as _zendesk_adapter
-
-
-async def _slack_adapter(
-    action: str, params: dict[str, Any], creds: Credentials
-) -> dict[str, Any]:
-    stub = {"tool": "slack", "action": action, "params": params, "stub": True}
-    if action == "post_message":
-        return {**stub, "ts": "1700000000.0001", "channel": params.get("channel")}
-    if action == "list_channels":
-        return {**stub, "channels": [{"id": "C123", "name": "general"}]}
-    if action == "get_channel_history":
-        return {**stub, "messages": [{"ts": "1", "text": "stub"}]}
-    return {**stub, "error": f"unknown slack action: {action}"}
-
-
-async def _hubspot_adapter(
-    action: str, params: dict[str, Any], creds: Credentials
-) -> dict[str, Any]:
-    stub = {"tool": "hubspot", "action": action, "params": params, "stub": True}
-    if action == "lookup_contact":
-        return {**stub, "contact": {"id": "ct_stub_1", "email": params.get("email"), "plan_tier": "essentials"}}
-    if action == "get_account_details":
-        return {**stub, "account": {"id": params.get("account_id"), "tier": "pro", "mrr": 499}}
-    return {**stub, "error": f"unknown hubspot action: {action}"}
 
 
 # ---------------------------------------------------------------------------
@@ -182,6 +149,14 @@ def install_builtins() -> None:
     register("zendesk", _zendesk_adapter)
     register("slack", _slack_adapter)
     register("hubspot", _hubspot_adapter)
+    register("gainsight", _gainsight_adapter)
+    register("gong", _gong_adapter)
+    register("vitally", _vitally_adapter)
+    register("github", _github_adapter)
+    register("klaviyo", _klaviyo_adapter)
+    register("marketo", _marketo_adapter)
+    register("discord", _discord_adapter)
+    register("discourse", _discourse_adapter)
 
     ACTION_CATALOG.update(
         {
@@ -204,26 +179,130 @@ def install_builtins() -> None:
                 ),
             },
             "intercom": {
-                "search_conversations": "Search Intercom conversations by body substring. params: {query: str}. Real when INTERCOM_API_TOKEN is set; stub otherwise.",
-                "get_conversation": "Fetch one conversation (plaintext). params: {id: str}. Returns {customer, messages: [{role, text}]}.",
-                "send_reply": "Reply to a conversation as an admin. params: {conversation_id: str, body: str}. Needs INTERCOM_API_TOKEN + INTERCOM_ADMIN_ID.",
-                "assign_to_agent": "Reassign a conversation to another admin. params: {conversation_id: str, agent_id: str, note?: str}. Needs INTERCOM_API_TOKEN + INTERCOM_ADMIN_ID.",
+                "search_conversations": (
+                    "Search Intercom conversations by body substring. "
+                    "params: {query: str}. Real when INTERCOM_API_TOKEN is set; stub otherwise."
+                ),
+                "get_conversation": (
+                    "Fetch one conversation (plaintext). params: {id: str}. "
+                    "Returns {customer, messages: [{role, text}]}."
+                ),
+                "send_reply": (
+                    "Reply to a conversation as an admin. "
+                    "params: {conversation_id: str, body: str}. "
+                    "Needs INTERCOM_API_TOKEN + INTERCOM_ADMIN_ID."
+                ),
+                "assign_to_agent": (
+                    "Reassign a conversation to another admin. "
+                    "params: {conversation_id: str, agent_id: str, note?: str}. "
+                    "Needs INTERCOM_API_TOKEN + INTERCOM_ADMIN_ID."
+                ),
             },
             "zendesk": {
-                "search_articles": "Semantic search of help center. params: {query: str}. Real if ZENDESK_{SUBDOMAIN,EMAIL,API_TOKEN} are set; stub otherwise.",
+                "search_articles": (
+                    "Semantic search of help center. params: {query: str}. "
+                    "Real if ZENDESK_{SUBDOMAIN,EMAIL,API_TOKEN} are set; stub otherwise."
+                ),
                 "get_article": "Fetch one article. params: {id: str}",
                 "search_tickets": "Find tickets. params: {query: str}",
                 "get_ticket": "Fetch one ticket. params: {id: str}",
-                "create_internal_note": "Add internal note. params: {ticket_id: str, body: str}",
+                "create_internal_note": ("Add internal note. params: {ticket_id: str, body: str}"),
             },
             "slack": {
-                "post_message": "Post to channel. params: {channel: str, text: str}",
-                "list_channels": "List channels. params: {}",
-                "get_channel_history": "Read recent channel messages. params: {channel: str, limit?: int}",
+                "post_message": (
+                    "Post to channel. params: {channel: str, text: str}. "
+                    "Real if SLACK_BOT_TOKEN is set; stub otherwise."
+                ),
+                "list_channels": (
+                    "List channels. params: {}. Real if SLACK_BOT_TOKEN is set; stub otherwise."
+                ),
+                "get_channel_history": (
+                    "Read recent channel messages. params: {channel: str, limit?: int}. "
+                    "Real if SLACK_BOT_TOKEN is set; stub otherwise."
+                ),
             },
             "hubspot": {
-                "lookup_contact": "Find a contact. params: {email: str}",
-                "get_account_details": "Account info. params: {account_id: str}",
+                "lookup_contact": (
+                    "Find a contact by email. params: {email: str}. "
+                    "Real if HUBSPOT_API_KEY is set; stub otherwise."
+                ),
+                "get_account_details": (
+                    "Company/account info. params: {account_id: str}. "
+                    "Real if HUBSPOT_API_KEY is set; stub otherwise."
+                ),
+            },
+            "gainsight": {
+                "get_account_health": (
+                    "CS health score for an account. params: {account_id: str}. "
+                    "Stub until HTTP is implemented (GAINSIGHT_API_KEY)."
+                ),
+                "list_ctas": (
+                    "Open CTAs for an account. params: {account_id?: str}. "
+                    "Stub until HTTP is implemented."
+                ),
+            },
+            "gong": {
+                "search_calls": (
+                    "Find recorded calls. params: {query: str}. "
+                    "Stub until HTTP is implemented (GONG_API_KEY)."
+                ),
+                "get_transcript": (
+                    "Fetch a call transcript. params: {call_id: str}. "
+                    "Stub until HTTP is implemented."
+                ),
+            },
+            "vitally": {
+                "get_account": (
+                    "CS account record. params: {account_id: str}. "
+                    "Stub until HTTP is implemented (VITALLY_API_KEY)."
+                ),
+                "list_accounts": (
+                    "List CS accounts. params: {query?: str}. Stub until HTTP is implemented."
+                ),
+            },
+            "github": {
+                "get_issue": (
+                    "Fetch one issue. params: {owner: str, repo: str, number: str}. "
+                    "Stub until HTTP is implemented (GITHUB_TOKEN)."
+                ),
+                "search_issues": (
+                    "Search issues/PRs. params: {query: str}. Stub until HTTP is implemented."
+                ),
+            },
+            "klaviyo": {
+                "list_campaigns": (
+                    "List email campaigns. params: {}. "
+                    "Stub until HTTP is implemented (KLAVIYO_API_KEY)."
+                ),
+                "get_profile": (
+                    "Look up a profile by email. params: {email: str}. "
+                    "Stub until HTTP is implemented."
+                ),
+            },
+            "marketo": {
+                "get_lead": (
+                    "Look up a lead by email. params: {email: str}. "
+                    "Stub until HTTP is implemented (MARKETO_API_KEY)."
+                ),
+                "list_campaigns": ("List campaigns. params: {}. Stub until HTTP is implemented."),
+            },
+            "discord": {
+                "list_channels": (
+                    "List community channels. params: {guild_id?: str}. "
+                    "Stub until HTTP is implemented (DISCORD_BOT_TOKEN)."
+                ),
+                "search_messages": (
+                    "Search recent messages. params: {query: str}. Stub until HTTP is implemented."
+                ),
+            },
+            "discourse": {
+                "search_topics": (
+                    "Search forum topics. params: {query: str}. "
+                    "Stub until HTTP is implemented (DISCOURSE_API_KEY)."
+                ),
+                "get_topic": (
+                    "Fetch one topic. params: {id: str}. Stub until HTTP is implemented."
+                ),
             },
         }
     )
