@@ -166,9 +166,12 @@ Call `submit_enablement_plan` exactly once. The tool's input schema IS the Enabl
 
 
 def _build_system_prompt(role: Role) -> str:
-    """Compose the system prompt from the role's domain knowledge file."""
-    dk_path = role.domain_knowledge_path
-    dk = dk_path.read_text(encoding="utf-8") if dk_path.exists() else ""
+    """Compose the system prompt from the role's domain knowledge.
+
+    Researched roles carry markdown on `role.domain_knowledge` and have no
+    directory. Seeded roles still load `domain_knowledge.md` from disk.
+    """
+    dk = role.domain_knowledge_text()
     return f"""\
 You are the {role.display_name} Enablement Agent for Enable AI.
 
