@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import {
   deleteCredential,
   listCredentials,
+  requiredCredentials,
   revealCredential,
   upsertCredential,
 } from "../lib/api";
-import type { CredentialSummary } from "../lib/types";
+import { readPendingKeys, readPendingTools } from "../lib/homeSession";
+import type { CredentialSummary, RequiredCredential } from "../lib/types";
 import Spinner from "./Spinner";
 
 interface RevealedState {
@@ -24,6 +26,14 @@ export default function CredentialsManager() {
   const [newValue, setNewValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const [needed, setNeeded] = useState<RequiredCredential[]>([]);
+
+  const startAdd = (key: string) => {
+    setNewKey(key);
+    setNewValue("");
+    setError(null);
+    setShowForm(true);
+  };
 
   const openForm = () => {
     setNewKey("");
@@ -48,7 +58,23 @@ export default function CredentialsManager() {
   };
 
   useEffect(() => {
-    refresh().finally(() => setLoading(false));
+    const names = readPendingTools();
+    const explicit = readPendingKeys().map((key) => ({ tool: "workflow", key }));
+    const neededRequest =
+      names.length === 0
+        ? Promise.resolve(explicit)
+        : requiredCredentials(names)
+            .then((report) => {
+              const seen = new Set(report.required.map((row) => row.key));
+              return [
+                ...report.required,
+                ...explicit.filter((row) => !seen.has(row.key)),
+              ];
+            })
+            .catch(() => explicit);
+    Promise.all([refresh(), neededRequest])
+      .then(([, rows]) => setNeeded(rows))
+      .finally(() => setLoading(false));
   }, []);
 
   const onSave = async () => {
@@ -131,6 +157,46 @@ export default function CredentialsManager() {
       {error && (
         <div className="rounded-md border border-rose-300 bg-rose-50 p-3 text-sm text-rose-800">
           <strong>Error:</strong> {error}
+        </div>
+      )}
+
+      {needed.length > 0 && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm">
+          <h3 className="font-semibold text-amber-950">
+            Keys for the plan you were building
+          </h3>
+          <p className="mt-2 text-amber-950">
+            Add each key below, then return to the workflow and confirm.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {needed.map((row) => {
+              const stored = creds.some((c) => c.key === row.key);
+              return (
+                <li
+                  key={`${row.tool}:${row.key}`}
+                  className="flex flex-wrap items-center gap-2"
+                >
+                  <span className="font-mono text-xs">
+                    {row.tool} → {row.key}
+                  </span>
+                  {stored ? (
+                    <span className="text-xs font-medium text-emerald-800">Stored</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => startAdd(row.key)}
+                      className="rounded-md bg-accent px-2 py-1 text-xs font-semibold text-white"
+                    >
+                      Add {row.key}
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          <a href="/" className="mt-3 inline-block font-medium text-amber-950 underline">
+            Back to the workflow
+          </a>
         </div>
       )}
 
