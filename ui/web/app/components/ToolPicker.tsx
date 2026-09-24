@@ -182,16 +182,19 @@ export default function ToolPicker({
                       Delete
                     </button>
                   )}
-                  <span
+                  <button
+                    type="button"
+                    onClick={() => onToggle(t.name)}
+                    disabled={disabled}
                     className={
                       "rounded px-2 py-1 text-xs " +
                       (isSelected
                         ? "bg-accent text-white"
-                        : "border border-neutral-300 text-neutral-700")
+                        : "border border-neutral-300 text-neutral-700 hover:bg-neutral-50")
                     }
                   >
                     {isSelected ? "Selected" : "Add"}
-                  </span>
+                  </button>
                 </div>
               </li>
             );
