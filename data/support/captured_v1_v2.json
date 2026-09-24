@@ -1,0 +1,271 @@
+{
+  "captured_at": "2026-09-24T02:53:07.578363+00:00",
+  "model": "claude-sonnet-4-6",
+  "temperature": 0.3,
+  "retrieval": "single policy section",
+  "judge": "orchestrators/support/judges/factual_accuracy.md against full policies.md",
+  "by_variation": {
+    "v1-baseline": {
+      "n": 8,
+      "mean_judge_score": 0.831,
+      "error_rate": 0.0,
+      "escalation_rate": 0.0
+    },
+    "v2-detailed-responses": {
+      "n": 8,
+      "mean_judge_score": 0.846,
+      "error_rate": 0.0,
+      "escalation_rate": 0.0
+    }
+  },
+  "runs": [
+    {
+      "id": "SCN-009",
+      "tags": [
+        "cancellation",
+        "hallucination_probe"
+      ],
+      "question": "I'm cancelling my venue booking for next Saturday. Will I get a full refund?",
+      "variation": "v1-baseline",
+      "reply": "**Re: Your Venue Booking Cancellation**\n\nThank you for reaching out. I'm sorry to hear you need to cancel your upcoming booking.\n\n**Regarding your refund:** Since your event is next Saturday, your cancellation falls within the **0\u201313 days before the event** window. Unfortunately, under our standard cancellation policy, **no refund is issued** for cancellations made this close to the event date.\n\nAdditionally, please keep in mind:\n\n- The **non-refundable deposit** is not returned regardless of when a cancellation occurs.\n- Any **committed vendor deposits** are not automatically refunded, though our Vendor Relations team will make every effort to recover them on your behalf to the extent the vendors are willing to return them.\n\n**Important note:** Your individual contract governs if its terms differ from the above, so I'd recommend reviewing your contract in case more favorable terms apply to your situation.\n\n---\n\n**Next steps:**\n1. To proceed with the cancellation, please contact us directly so we can process it officially.\n2. If you believe there are exceptional circumstances, or if you'd like us to begin vendor deposit recovery efforts, our team is happy to assist.\n\nPlease don't hesitate to reach out if you have any questions or need further clarification. We're here to help make this process as smooth as possible.",
+      "citations": [
+        "data/support/policies.md#cancellation-refund-schedule"
+      ],
+      "judge_score": 1.0,
+      "error": null,
+      "escalated": false
+    },
+    {
+      "id": "SCN-009",
+      "tags": [
+        "cancellation",
+        "hallucination_probe"
+      ],
+      "question": "I'm cancelling my venue booking for next Saturday. Will I get a full refund?",
+      "variation": "v2-detailed-responses",
+      "reply": "Here's a draft reply:\n\n---\n\n**Re: Cancellation of Your Venue Booking**\n\nThank you for reaching out. I'm sorry to hear you need to cancel your upcoming booking.\n\n**Regarding your refund:** Since your event is next Saturday, your cancellation falls within the **0\u201313 days before the event** window. Unfortunately, under our standard cancellation policy, **no refund is issued** for cancellations made within 13 days of the event.\n\nThere are a couple of additional things worth knowing:\n\n- **Non-refundable deposit:** Even in cases where a partial refund would apply, the initial deposit you paid is non-refundable (it covers the venue hold, event lead time, and vendor contracts secured on your behalf). This is never returned except in the event of a Serenia breach.\n\n- **Vendor deposits:** If any vendor deposits were committed on your behalf, our Vendor Relations team will attempt to recover those from the vendors directly. Any amounts successfully recovered would be returned to you, but this depends entirely on what each individual vendor is willing to return.\n\n**Important note:** Please review your specific contract, as its terms take precedence over our standard schedule if there are any differences.\n\nIf you'd like to proceed with the cancellation or have any questions, please don't hesitate to reach out and we'll do our best to assist you through the process.\n\n---\n\n*Want me to adjust the tone or add anything?*",
+      "citations": [
+        "data/support/policies.md#cancellation-refund-schedule"
+      ],
+      "judge_score": 0.95,
+      "error": null,
+      "escalated": false
+    },
+    {
+      "id": "SCN-010",
+      "tags": [
+        "cancellation",
+        "hallucination_probe"
+      ],
+      "question": "I have to cancel due to a family medical emergency. What's the process and what should I know about refunds?",
+      "variation": "v1-baseline",
+      "reply": "**Subject: We're So Sorry \u2013 Here's How We'll Help You Through This**\n\nFirst and foremost, please know that our hearts go out to you and your family during this difficult time. We want to make this process as straightforward as possible so you can focus on what matters most right now.\n\n---\n\n**How to Cancel**\n\nTo initiate your cancellation, please reach out to your dedicated event coordinator directly, or contact our support team and we'll connect you right away. We'll handle the paperwork and next steps from there.\n\n---\n\n**What to Know About Refunds**\n\nYour refund will depend on how many days remain before your event date, based on our standard schedule:\n\n| Days Before Event | Refund of Eligible Amounts |\n|---|---|\n| 90+ days | 100% |\n| 60\u201389 days | 75% |\n| 30\u201359 days | 50% |\n| 14\u201329 days | 25% |\n| 0\u201313 days | 0% |\n\nA few important things to be aware of:\n\n- **Non-refundable deposit:** The initial deposit is non-refundable, as it covers your venue hold and vendor contracts secured on your behalf.\n- **Vendor deposits:** For any vendor deposits already committed, our Vendor Relations team will actively work to recover as much as possible \u2014 though the amount returned ultimately depends on each individual vendor's policy.\n- **Your contract governs:** Please review your signed contract, as its specific terms take precedence if anything differs from the above.\n\n---\n\n**Our Commitment to You**\n\nWe will advocate on your behalf with vendors and do everything within our power to maximize your recovery. Please don't hesitate to reach out \u2014 we're here for you every step of the way.\n\nWishing your family a swift recovery. \ud83d\udc9b",
+      "citations": [
+        "data/support/policies.md#cancellation-refund-schedule"
+      ],
+      "judge_score": 1.0,
+      "error": null,
+      "escalated": false
+    },
+    {
+      "id": "SCN-010",
+      "tags": [
+        "cancellation",
+        "hallucination_probe"
+      ],
+      "question": "I have to cancel due to a family medical emergency. What's the process and what should I know about refunds?",
+      "variation": "v2-detailed-responses",
+      "reply": "**Subject: We're So Sorry to Hear This \u2014 Here's How We Can Help**\n\n---\n\nFirst and foremost, we're truly sorry to hear about your family medical emergency. Please know that our team is here to make this process as straightforward as possible during what must be a very difficult time.\n\n**Here's what you need to do to initiate your cancellation:**\n\n1. **Submit a written cancellation request** to your event coordinator (or our support team if you don't have one assigned). This establishes your official cancellation date, which determines your refund amount.\n2. **Gather any documentation** related to the emergency \u2014 while not always required, medical documentation can be helpful if there are any questions about timing.\n\n---\n\n**What to expect on refunds:**\n\nYour refund is based on how many days remain before your event at the time of cancellation:\n\n| Days Before Event | Refund of Eligible Amounts |\n|---|---|\n| 90+ days | 100% |\n| 60\u201389 days | 75% |\n| 30\u201359 days | 50% |\n| 14\u201329 days | 25% |\n| 0\u201313 days | 0% |\n\n**A few important things to be aware of:**\n\n- \ud83d\udccc **Your non-refundable deposit** is not included in the above refund schedule \u2014 this covers venue holds and vendor contracts secured on your behalf, and unfortunately cannot be returned.\n- \ud83d\udccc **Vendor deposits** (e.g., photographers, caterers) are a separate matter. Our Vendor Relations team will proactively contact all vendors to attempt recovery of any deposits paid on your behalf, but the amount returned depends on each vendor's own policies. We'll keep you updated on every recovery attempt.\n- \ud83d\udccc **Your contract terms govern** \u2014 if your specific contract includes any different terms, those will take precedence, so it's worth reviewing your agreement.\n\n---\n\nPlease don't hesitate to reach out with any questions. We'll do everything we can to support you through this. \ud83d\udc99",
+      "citations": [
+        "data/support/policies.md#cancellation-refund-schedule"
+      ],
+      "judge_score": 0.95,
+      "error": null,
+      "escalated": false
+    },
+    {
+      "id": "SCN-011",
+      "tags": [
+        "billing"
+      ],
+      "question": "I see two $1,200 charges on my card for the venue deposit. Looks like a duplicate \u2014 please refund the second one.",
+      "variation": "v1-baseline",
+      "reply": "Subject: Re: Duplicate Charge on Your Account\n\nHi there,\n\nThank you for flagging this \u2014 I completely understand how concerning it is to see two identical charges on your card, and I want to help get this sorted out as quickly as possible.\n\nA duplicate charge like this is not intentional, and I want to assure you that **if a second $1,200 charge was processed in error, you are absolutely entitled to a full refund of that duplicate amount.** This is separate from any cancellation or deposit policy \u2014 we're simply talking about correcting a billing mistake.\n\n**Here's what I'd like to do next:**\n\n1. **Please share your booking reference number** (and the email address on your account) so I can pull up your payment history right away.\n2. Our billing team will verify the transaction records to confirm the duplicate charge.\n3. Once confirmed, we'll initiate a refund of the second $1,200 to your original payment method promptly.\n\nRefunds typically appear within **5\u201310 business days** depending on your bank, though we'll process our end as quickly as possible.\n\nAgain, I apologize for any stress this has caused. Billing errors like this are taken seriously, and we'll make sure it's resolved correctly.\n\nPlease reply with your booking details and we'll get right on it! \ud83d\ude0a\n\nWarm regards,\n**Serenia & Co. Support Team**",
+      "citations": [
+        "data/support/policies.md#cancellation-refund-schedule"
+      ],
+      "judge_score": 0.6,
+      "error": null,
+      "escalated": false
+    },
+    {
+      "id": "SCN-011",
+      "tags": [
+        "billing"
+      ],
+      "question": "I see two $1,200 charges on my card for the venue deposit. Looks like a duplicate \u2014 please refund the second one.",
+      "variation": "v2-detailed-responses",
+      "reply": "Subject: Re: Duplicate Charge on Your Account\n\nHi there,\n\nThank you for flagging this \u2014 I completely understand how concerning it is to see two identical charges on your card, and I want to help get this sorted out as quickly as possible.\n\n**What I'm doing right now:**\nI'm escalating this to our billing team to investigate the duplicate $1,200 charge immediately. Duplicate charges are not intentional, and if confirmed, the second charge will be refunded in full.\n\n**What to expect:**\n- Our billing team will review your transaction history and confirm whether this is indeed a duplicate\n- If confirmed, the refund will be processed back to your original payment method\n- Refunds typically appear within **5\u201310 business days**, depending on your bank or card issuer\n\n**In the meantime, I'd recommend:**\n- Checking your email for two separate charge receipts, which can help our team verify the issue faster\n- Having your booking/confirmation number handy when our billing team follows up\n\n---\n\n**A quick note for transparency:** The cancellation refund policy and non-refundable deposit rules that apply to your booking are *not* relevant here \u2014 a duplicate charge is a billing error, not a cancellation, and would be refunded entirely regardless of those policies.\n\nPlease reply with your **booking ID and the email address on your account** so I can flag this as urgent for our billing team right away.\n\nWe'll make this right! \ud83d\ude0a\n\nWarm regards,\n**Serenia & Co. Support Team**",
+      "citations": [
+        "data/support/policies.md#cancellation-refund-schedule"
+      ],
+      "judge_score": 0.72,
+      "error": null,
+      "escalated": false
+    },
+    {
+      "id": "SCN-012",
+      "tags": [
+        "vendor_underdelivery"
+      ],
+      "question": "The caterer was 90 minutes late serving dinner. Several guests left. I think a partial refund on the catering line is warranted.",
+      "variation": "v1-baseline",
+      "reply": "Subject: Re: Catering Delay at Your Event\n\nDear [Customer Name],\n\nThank you for reaching out, and I'm truly sorry to hear that your caterer arrived 90 minutes late and that guests left as a result. That is absolutely not the experience we want for you, and I understand your frustration completely.\n\nI want to be transparent with you: **the policy section I have on hand covers our cancellation and refund schedule**, which unfortunately doesn't directly address service failure or vendor performance issues like the one you experienced. I don't want to give you inaccurate information about what compensation may be available under your specific contract.\n\nHere's what I'd recommend as next steps:\n\n1. **Review your contract** \u2013 Your individual contract with Serenia & Co. governs situations like this and may include service level expectations or remedies for vendor performance failures.\n\n2. **Escalate to our Vendor Relations team** \u2013 They are best positioned to investigate what happened with the caterer, document the delay, and pursue any applicable remedy or partial refund on your behalf. A 90-minute delay with guest impact is a serious service failure that warrants a formal review.\n\n3. **Document everything** \u2013 If you haven't already, please gather any photos, timestamps, or guest accounts that support your claim. This will strengthen any case made to the vendor.\n\n**Please contact us directly at [support contact]** so we can connect you with the right team right away.\n\nYou deserve accountability here, and we want to make this right.\n\nWarm regards,\nSerenia & Co. Support Team",
+      "citations": [
+        "data/support/policies.md#cancellation-refund-schedule"
+      ],
+      "judge_score": 0.7,
+      "error": null,
+      "escalated": false
+    },
+    {
+      "id": "SCN-012",
+      "tags": [
+        "vendor_underdelivery"
+      ],
+      "question": "The caterer was 90 minutes late serving dinner. Several guests left. I think a partial refund on the catering line is warranted.",
+      "variation": "v2-detailed-responses",
+      "reply": "Dear [Customer Name],\n\nThank you for reaching out, and I'm truly sorry to hear about the significant delay with your catering service. A 90-minute delay to dinner service is a serious disruption, and I completely understand your frustration \u2014 especially with guests leaving as a result.\n\n**Regarding your refund request:**\n\nI want to be transparent with you: the policy section I have on hand covers our *cancellation* refund schedule, which unfortunately doesn't directly apply to your situation since this is a **service failure claim** rather than a cancellation. I don't want to give you inaccurate information based on the wrong policy framework.\n\n**Here's what I'd recommend as next steps:**\n\n1. **File a formal service complaint** \u2014 Please document the incident in writing (timeline, number of guests affected, any supporting evidence such as photos or guest accounts). This creates an official record for your claim.\n\n2. **Review your contract** \u2014 Your signed contract may include service level guarantees or remedies for vendor performance failures that would govern this situation.\n\n3. **Speak with our Vendor Relations team** \u2014 They handle disputes with vendors directly and are best positioned to pursue compensation on your behalf from the caterer.\n\nI want to make sure this is handled properly and that you receive a fair resolution. Could you share your booking reference number so I can flag this to the right team right away?\n\nAgain, I sincerely apologize for the experience.\n\nWarm regards,\nSerenia & Co. Support",
+      "citations": [
+        "data/support/policies.md#cancellation-refund-schedule"
+      ],
+      "judge_score": 0.7,
+      "error": null,
+      "escalated": false
+    },
+    {
+      "id": "SCN-013",
+      "tags": [
+        "billing"
+      ],
+      "question": "Our final invoice is $640 higher than the contracted total. We need this corrected before AP will pay.",
+      "variation": "v1-baseline",
+      "reply": "Subject: Re: Invoice Discrepancy \u2013 $640 Overcharge\n\nThank you for bringing this to our attention. I completely understand the urgency, especially with your AP department holding payment pending resolution.\n\n**Here's what I'd like to do to get this corrected quickly:**\n\nA $640 discrepancy between your contracted total and the final invoice needs to be reviewed and resolved by our billing team. To investigate this promptly, could you please provide:\n\n1. **Your contract number / booking ID**\n2. **A copy of the final invoice** (or the invoice number)\n3. **The line item(s)** that appear to differ from your contracted amount, if you've been able to identify them\n\nCommon causes for invoice variances include scope changes, add-on services, or vendor cost adjustments \u2014 but **if the charges are not supported by your contract or a signed change order, you should not be billed for them.**\n\n**Next steps:**\n- I'll escalate this to our billing team as a priority dispute\n- They will compare the invoice against your original contract\n- If an error is confirmed, a corrected invoice will be issued promptly\n\nPlease reply with the details above, or feel free to call us directly so we can pull up your account in real time and work toward a same-day resolution.\n\nWe want to make sure this is accurate and that your payment isn't delayed any further. Thank you for your patience!",
+      "citations": [
+        "data/support/policies.md#cancellation-refund-schedule"
+      ],
+      "judge_score": 0.6,
+      "error": null,
+      "escalated": false
+    },
+    {
+      "id": "SCN-013",
+      "tags": [
+        "billing"
+      ],
+      "question": "Our final invoice is $640 higher than the contracted total. We need this corrected before AP will pay.",
+      "variation": "v2-detailed-responses",
+      "reply": "Subject: Re: Invoice Discrepancy \u2013 $640 Overcharge\n\nThank you for bringing this to our attention. I completely understand the urgency, especially with your AP department waiting on resolution before processing payment.\n\n**Here's how we'll address this:**\n\nA $640 discrepancy between your contracted total and your final invoice is something we take seriously and want to resolve quickly. To investigate and correct this, our billing team will need to:\n\n1. **Pull your original signed contract** to confirm the agreed-upon total\n2. **Review your final invoice line by line** to identify the source of the $640 difference\n3. **Issue a corrected invoice** if the charge is not supported by your contract or an approved change order\n\n**To get this moving right away, please provide:**\n- Your booking/contract reference number\n- A copy of your final invoice (if not already on file)\n- Any change orders or addendums signed after your original contract\n\n**A couple of things to be aware of:**\n- If the difference relates to any scope changes or add-ons approved during the planning process, those would be reflected in signed change orders \u2014 we'll verify whether any such documentation exists.\n- If no change order supports the additional $640, a corrected invoice will be issued promptly.\n\nPlease reply here or email **billing@sereniaandco.com** with your details, and we'll prioritize this for you.\n\nWe want to make sure your AP team has everything they need as quickly as possible. Apologies for any inconvenience this has caused.",
+      "citations": [
+        "data/support/policies.md#cancellation-refund-schedule"
+      ],
+      "judge_score": 0.6,
+      "error": null,
+      "escalated": false
+    },
+    {
+      "id": "SCN-014",
+      "tags": [
+        "policy_lookup"
+      ],
+      "question": "What's your cancellation refund schedule for events that are still 90+ days out?",
+      "variation": "v1-baseline",
+      "reply": "**Re: Cancellation Refund for Events 90+ Days Out**\n\nGreat news \u2014 if your event is still **90 or more days away**, our standard cancellation policy provides a **100% refund** of your paid amounts.\n\nHere are a couple of important things to keep in mind:\n\n- **Non-refundable deposit:** The initial deposit is excluded from this refund. This deposit covers things like your venue hold, event lead time, and vendor contracts secured on your behalf, and is non-refundable under standard circumstances.\n- **Vendor deposits:** If vendor deposits have already been committed, we'll do our best to recover those on your behalf \u2014 but any recovery depends on what the individual vendor is able to return.\n- **Your contract governs:** The above reflects our standard policy, but please refer to your specific contract, as its terms take precedence if there are any differences.\n\nIf you're considering a cancellation or have questions about your specific situation, we'd recommend reaching out to your event lead as soon as possible so we can walk you through the details and start any necessary processes promptly.\n\nIs there anything else I can help you with? \ud83d\ude0a",
+      "citations": [
+        "data/support/policies.md#cancellation-refund-schedule"
+      ],
+      "judge_score": 1.0,
+      "error": null,
+      "escalated": false
+    },
+    {
+      "id": "SCN-014",
+      "tags": [
+        "policy_lookup"
+      ],
+      "question": "What's your cancellation refund schedule for events that are still 90+ days out?",
+      "variation": "v2-detailed-responses",
+      "reply": "**Re: Cancellation Refund for Events 90+ Days Out**\n\nGreat news \u2014 if your event is still 90 or more days away, you're in the best possible window for a cancellation refund!\n\nHere's what you can expect:\n\n\u2705 **100% refund** of all paid amounts (excluding the non-refundable deposit)\n\n---\n\n**A few important things to keep in mind:**\n\n1. **Non-refundable deposit:** The initial deposit is never refundable, regardless of when you cancel. This covers the venue hold, event lead time, and the vendor contracts Serenia locks in on your behalf during the first 90 days of planning.\n\n2. **Vendor deposits:** If deposits have already been committed to vendors on your behalf, recovery of those funds depends on what the individual vendor is willing to return. Our Vendor Relations team proactively works to recover these amounts in all cancellation cases, but we can't guarantee full recovery.\n\n3. **Your contract governs:** The above reflects our standard schedule, but your specific contract terms take precedence if there are any differences.\n\n---\n\nIf you're considering a cancellation or just want to understand your options, we'd recommend reaching out to your event lead directly so we can review your specific contract and give you an exact picture of what to expect.\n\nIs there anything else we can help you with? \ud83d\ude0a",
+      "citations": [
+        "data/support/policies.md#cancellation-refund-schedule"
+      ],
+      "judge_score": 1.0,
+      "error": null,
+      "escalated": false
+    },
+    {
+      "id": "SCN-031",
+      "tags": [
+        "postponement",
+        "hallucination_probe"
+      ],
+      "question": "If we postpone instead of cancelling, can we reschedule once within 12 months at no charge?",
+      "variation": "v1-baseline",
+      "reply": "Thank you for your question! It's great that you're considering a postponement rather than a cancellation \u2014 that's often a smart way to protect your investment.\n\nHowever, I want to be transparent with you: **the policy documentation I have access to covers our cancellation and refund schedule, but does not include specific details about a complimentary reschedule window for postponements.**\n\nBecause I don't want to give you inaccurate information on something this important, I'd strongly recommend:\n\n1. **Reviewing your contract directly** \u2014 your individual contract may include postponement terms that differ from our standard policy.\n2. **Reaching out to your event lead or our team directly** so we can confirm exactly what postponement options are available to you and whether a no-charge reschedule within 12 months applies to your booking.\n\nWhat I *can* tell you is that postponing is generally preferable to cancelling when it comes to protecting payments already made, since cancellations are subject to our refund schedule and non-refundable deposit terms.\n\nPlease don't hesitate to contact us directly and we'll make sure you get a clear, accurate answer specific to your event. We want to make this as smooth as possible for you! \ud83d\udc9b",
+      "citations": [
+        "data/support/policies.md#cancellation-refund-schedule"
+      ],
+      "judge_score": 0.9,
+      "error": null,
+      "escalated": false
+    },
+    {
+      "id": "SCN-031",
+      "tags": [
+        "postponement",
+        "hallucination_probe"
+      ],
+      "question": "If we postpone instead of cancelling, can we reschedule once within 12 months at no charge?",
+      "variation": "v2-detailed-responses",
+      "reply": "Thank you for your question! I want to make sure I give you completely accurate information on this.\n\n**Based on the policy documentation I have available, I can only confirm our standard cancellation and refund schedule** \u2014 I don't currently have specific policy details regarding a **no-charge reschedule window for postponements**.\n\nHere's what I *can* confirm from our standard policy:\n\n- Cancellations are subject to the refund schedule above, with the **non-refundable deposit** always excluded\n- Vendor deposit recovery depends on what individual vendors are able to return\n\n**Regarding your postponement/reschedule question**, this is an important detail that I wouldn't want to answer incorrectly, as it could affect your planning decisions. I'd recommend:\n\n1. **Reviewing your specific contract**, as your individual contract terms govern and may explicitly address postponement rights\n2. **Reaching out directly to your event lead** at Serenia & Co., who can confirm exactly what reschedule provisions apply to your booking\n\nWould you like help connecting with your event coordinator, or is there anything else I can assist you with in the meantime? \ud83d\ude0a",
+      "citations": [
+        "data/support/policies.md#cancellation-refund-schedule"
+      ],
+      "judge_score": 1.0,
+      "error": null,
+      "escalated": false
+    },
+    {
+      "id": "SCN-032",
+      "tags": [
+        "weather",
+        "hallucination_probe"
+      ],
+      "question": "We're cancelling because of a weather warning. Is there a vendor coordination fee taken out of the refund?",
+      "variation": "v1-baseline",
+      "reply": "Dear Customer,\n\nThank you for reaching out, and we're sorry to hear you're facing this situation due to a weather warning.\n\n**Regarding your question about a vendor coordination fee:** Based on our standard policy, there is no separate \"vendor coordination fee\" deducted from your refund. However, here's what you should be aware of:\n\n1. **Refund Schedule** \u2013 The amount refunded depends on how many days before your event you are cancelling (see our standard schedule above). Your specific contract may vary, so we'd recommend reviewing it or reaching out to your event lead for confirmation.\n\n2. **Non-Refundable Deposit** \u2013 Your initial deposit is non-refundable, as it covers venue holds, event lead time, and vendor contracts secured on your behalf.\n\n3. **Committed Vendor Deposits** \u2013 If vendors have already been paid deposits on your behalf, those amounts are only recoverable to the extent that the vendors themselves agree to return them. Our Vendor Relations team will proactively work to recover as much as possible on your behalf in all cancellation cases.\n\n**Our recommendation:** Please contact your dedicated event lead as soon as possible so we can:\n- Confirm your exact refund eligibility based on your contract and timeline\n- Begin vendor recovery efforts promptly on your behalf\n\nWe'll do everything we can to support you through this process. Please don't hesitate to reach out with any further questions.\n\nWarm regards,\n**Serenia & Co. Support Team**",
+      "citations": [
+        "data/support/policies.md#cancellation-refund-schedule"
+      ],
+      "judge_score": 0.85,
+      "error": null,
+      "escalated": false
+    },
+    {
+      "id": "SCN-032",
+      "tags": [
+        "weather",
+        "hallucination_probe"
+      ],
+      "question": "We're cancelling because of a weather warning. Is there a vendor coordination fee taken out of the refund?",
+      "variation": "v2-detailed-responses",
+      "reply": "Dear Customer,\n\nThank you for reaching out, and we're sorry to hear you're facing this situation due to a weather warning.\n\n**Regarding your specific question about a vendor coordination fee:** There is no separate vendor coordination fee deducted from your refund. However, there are a couple of important things to be aware of:\n\n**Standard Cancellation Refund**\nYour refund amount depends on how many days before your event you're cancelling, per our standard schedule:\n\n| Days Before Event | Refund of Paid Amounts |\n|---|---|\n| 90+ days | 100% |\n| 60\u201389 days | 75% |\n| 30\u201359 days | 50% |\n| 14\u201329 days | 25% |\n| 0\u201313 days | 0% |\n\n*(Note: Your individual contract governs if there are any differences.)*\n\n**Two Things to Keep in Mind:**\n\n1. **Non-refundable deposit** \u2013 The initial deposit is non-refundable regardless of the reason for cancellation, as it covers your venue hold, event lead time, and vendor contracts secured on your behalf.\n\n2. **Committed vendor deposits** \u2013 If vendors have already been paid deposits on your behalf, recovery of those amounts depends on what each individual vendor is willing to return. Our Vendor Relations team will proactively work to recover as much as possible for you.\n\nWe'd recommend checking your contract for any specific terms, and please don't hesitate to reach out so we can begin the cancellation process and vendor recovery efforts right away.\n\nWishing you safety during the weather event. \ud83c\udf27\ufe0f\n\nWarm regards,\n**Serenia & Co. Support Team**",
+      "citations": [
+        "data/support/policies.md#cancellation-refund-schedule"
+      ],
+      "judge_score": 0.85,
+      "error": null,
+      "escalated": false
+    }
+  ]
+}

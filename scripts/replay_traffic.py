@@ -5,7 +5,8 @@ the `tutorial-01-multi-signal-guardrails` tutorial expects:
 
   - 200 inquiries total
   - 15 minutes wall-clock (rate = 15*60 / 199 ≈ 4.52s between calls)
-  - Force traffic through a specified AI Config variation
+  - Label logs with ``--variation``; LaunchDarkly targeting still chooses
+    the served variation during a guarded rollout
 
 Usage:
     python scripts/replay_traffic.py --variation v2-detailed-responses

@@ -178,5 +178,17 @@
     "inquiry_text": "Need a status update on the venue contract amendment, and also want to cancel one of the add-ons we requested.",
     "expected_skill_invoked": "STATUS",
     "tags": ["status_check", "scope_change"]
+  },
+  {
+    "id": "SCN-031",
+    "inquiry_text": "If we postpone instead of cancelling, can we reschedule once within 12 months at no charge?",
+    "expected_skill_invoked": "REFUND",
+    "tags": ["postponement", "hallucination_probe"]
+  },
+  {
+    "id": "SCN-032",
+    "inquiry_text": "We're cancelling because of a weather warning. Is there a vendor coordination fee taken out of the refund?",
+    "expected_skill_invoked": "REFUND",
+    "tags": ["weather", "hallucination_probe"]
   }
 ]
