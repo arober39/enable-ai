@@ -1,10 +1,14 @@
 import type {
   CredentialRevealResponse,
   CredentialSummary,
+  RequiredCredentials,
   EnablementPlan,
   EnablementResponse,
   GeneratorRunResult,
+  DeclaredStack,
   OrchestratorResponse,
+  OutcomeRecord,
+  RecommendationMetrics,
   Recommendation,
   RoleSummary,
   RunOrchestratorRequest,
@@ -27,6 +31,17 @@ const API_BASE =
 // timeout but we set one explicitly so a hung backend surfaces as an error
 // instead of a tab that spins forever.
 const REQUEST_TIMEOUT_MS = 120_000;
+
+/** HTTP failure from the FastAPI backend. `status` is the response code. */
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
 
 /**
  * Tiny fetch wrapper. Always points at the FastAPI backend directly.
@@ -54,7 +69,7 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
       } catch {
         /* ignore */
       }
-      throw new Error(detail);
+      throw new ApiError(res.status, detail);
     }
     return (await res.json()) as T;
   } catch (err) {
@@ -101,6 +116,20 @@ export function runEnablement(
 
 export function listRoles(): Promise<RoleSummary[]> {
   return fetchJson<RoleSummary[]>("/api/roles");
+}
+
+export function researchRole(name: string): Promise<RoleSummary> {
+  return fetchJson<RoleSummary>("/api/roles/research", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function deleteCachedRole(id: string): Promise<{ removed: boolean }> {
+  return fetchJson<{ removed: boolean }>(
+    `/api/roles/cache/${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+  );
 }
 
 export function getPreferences(): Promise<UserPreferences> {
@@ -160,11 +189,48 @@ export function fetchHealth(): Promise<{
   ok: boolean;
   demo_mode: boolean;
   has_anthropic_key: boolean;
+  boot_id: string;
 }> {
   return fetchJson("/api/health");
 }
 
 // ----- Credentials -----
+
+export async function synthesizeSpeech(text: string): Promise<Blob> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${API_BASE}/api/speech`, {
+      method: "POST",
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        const body = await res.json();
+        if (body?.detail) detail = String(body.detail);
+      } catch {
+        /* audio errors may not be JSON */
+      }
+      throw new ApiError(res.status, detail);
+    }
+    return await res.blob();
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export function workflowCredentials(role?: string): Promise<RequiredCredentials> {
+  const query = role ? `?role=${encodeURIComponent(role)}` : "";
+  return fetchJson<RequiredCredentials>(`/api/credentials/for-workflow${query}`);
+}
+
+export function requiredCredentials(tools: string[]): Promise<RequiredCredentials> {
+  const query = encodeURIComponent(tools.join(","));
+  return fetchJson<RequiredCredentials>(`/api/credentials/required?tools=${query}`);
+}
 
 export function listCredentials(): Promise<CredentialSummary[]> {
   return fetchJson<CredentialSummary[]>("/api/credentials");
@@ -232,6 +298,31 @@ export function runWorkflow(
   return fetchJson<WorkflowRunResult>("/api/run-workflow", {
     method: "POST",
     body: JSON.stringify({ payload, ...(role ? { role } : {}) }),
+  });
+}
+
+export function getDeclaredStack(roleId: string): Promise<DeclaredStack> {
+  return fetchJson<DeclaredStack>(`/api/stacks/${encodeURIComponent(roleId)}`);
+}
+
+export function listOutcomes(): Promise<OutcomeRecord[]> {
+  return fetchJson<OutcomeRecord[]>("/api/outcomes");
+}
+
+export function outcomeSummary(): Promise<RecommendationMetrics[]> {
+  return fetchJson<RecommendationMetrics[]>("/api/outcomes/summary");
+}
+
+export function rollbackRecommendation(
+  recommendationId: string,
+  role?: string,
+): Promise<OutcomeRecord> {
+  return fetchJson<OutcomeRecord>("/api/rollback", {
+    method: "POST",
+    body: JSON.stringify({
+      recommendation_id: recommendationId,
+      ...(role ? { role } : {}),
+    }),
   });
 }
 
