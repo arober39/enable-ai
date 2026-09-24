@@ -24,34 +24,20 @@ from coordinator.schemas import (
     PlanMetadata,
     Recommendation,
 )
+from core.credentials import Credentials
 from core.identity import UserContext
+from core.jev import classify_coverage
 from core.roles import Role
 from core.tool_catalog import ToolCapability, load_tool
 
 _Status = Literal["covered", "partial", "gap", "redundant"]
 
 
-def _classify_tool(cap: ToolCapability) -> tuple[str, _Status]:
-    """Pick a capability area + status heuristic for a single tool.
-
-    Returns (capability_name, status). Drives the synthetic
-    CapabilityFinding list. Loosely mirrors the assessment a real
-    Enablement Agent would produce — heuristic, not reasoning.
-    """
-    cats_text = " ".join(cap.categories).lower()
-    if "ticketing" in cats_text:
-        return ("first_response_drafting", "covered")
-    if "knowledge_base" in cats_text:
-        return ("faq_retrieval", "covered")
-    if "internal_messaging" in cats_text or "team_collaboration" in cats_text:
-        return ("escalation_routing", "partial")
-    if "crm" in cats_text:
-        return ("knowledge_base_search", "partial")
-    return ("intent_classification", "partial")
-
-
 def build_synthetic_plan(
-    tools: list[str], role: Role, user: UserContext
+    tools: list[str],
+    role: Role,
+    user: UserContext,
+    creds: Credentials | None = None,
 ) -> EnablementPlan:
     """Build a deterministic synthetic EnablementPlan from the catalog.
 
@@ -82,13 +68,23 @@ def build_synthetic_plan(
             )
             continue
         loaded.append(cap)
-        capability, status = _classify_tool(cap)
+        others = [name for name in tools if name != tool_name]
+        judged = classify_coverage(
+            tool_name=tool_name,
+            categories=list(cap.categories),
+            capability=None,
+            other_tools=others,
+            creds=creds,
+        )
+        status: _Status = judged["status"]
+        note = cap.notes or ""
+        source_note = f"Coverage status source: {judged['source']} ({judged['mode']})."
         findings.append(
             CapabilityFinding(
-                capability=capability,
+                capability=judged["capability"],
                 status=status,
                 tools_involved=[tool_name],
-                notes=cap.notes,
+                notes=f"{note}\n{source_note}".strip(),
             )
         )
         if cap.mcp_server.available:
