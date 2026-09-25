@@ -23,6 +23,7 @@ from typing import Any
 from claude_agent_sdk import AgentDefinition
 
 from coordinator.definition import SUBMIT_PLAN_TOOL_NAME
+from enablement_agents.role_agent import resolve_role_agent_model
 from enablement_agents.support.tools import (
     LOOKUP_TOOL_QUALIFIED_NAME,
     SUPPORT_MCP_SERVER_NAME,
@@ -70,15 +71,26 @@ def _load_system_prompt() -> str:
 SUPPORT_AGENT_SYSTEM_PROMPT: str = _load_system_prompt()
 
 
-support_enablement_agent: AgentDefinition = AgentDefinition(
-    description=(
-        "Enables AI capabilities for customer support functions. Reads the support "
-        "stack file, gathers per-tool capability data via lookup_tool_capability, "
-        "consults domain knowledge, and produces a structured EnablementPlan. "
-        "On a separate invocation (Phase 5), generates the runnable support orchestrator."
-    ),
-    prompt=SUPPORT_AGENT_SYSTEM_PROMPT,
-    tools=[*SUPPORT_AGENT_BASE_TOOLS, *SUPPORT_AGENT_MCP_TOOLS],
-    mcpServers=SUPPORT_AGENT_MCP_SERVERS,
-    model="claude-sonnet-4-6",
-)
+def build_support_enablement_agent() -> AgentDefinition:
+    """Build the support agent's AgentDefinition with the shared planner model.
+
+    The model is resolved at call time so ``ENABLEMENT_AGENT_MODEL`` matches
+    the role-agent factory (Opus 5.5 unless overridden).
+    """
+    return AgentDefinition(
+        description=(
+            "Enables AI capabilities for customer support functions. Reads the support "
+            "stack file, gathers per-tool capability data via lookup_tool_capability, "
+            "consults domain knowledge, and produces a structured EnablementPlan. "
+            "On a separate invocation (Phase 5), generates the runnable support orchestrator."
+        ),
+        prompt=SUPPORT_AGENT_SYSTEM_PROMPT,
+        tools=[*SUPPORT_AGENT_BASE_TOOLS, *SUPPORT_AGENT_MCP_TOOLS],
+        mcpServers=SUPPORT_AGENT_MCP_SERVERS,
+        model=resolve_role_agent_model(),
+    )
+
+
+#: Import-time snapshot. Prefer ``build_support_enablement_agent()`` when the
+#: model must honor an env change made after this module was imported.
+support_enablement_agent: AgentDefinition = build_support_enablement_agent()

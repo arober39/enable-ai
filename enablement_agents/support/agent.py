@@ -41,13 +41,14 @@ from coordinator.hooks.enforce_writes import enforce_writes
 from coordinator.hooks.normalize_responses import normalize_responses
 from coordinator.schemas import EnablementPlan, OrchestratorRunResult
 from enablement_agents.base import EnablementAgentBase, EnablementAgentConfig, StackFile
+from enablement_agents.role_agent import resolve_role_agent_model
 from enablement_agents.support.definition import (
     SUPPORT_AGENT_BASE_TOOLS,
     SUPPORT_AGENT_MCP_TOOLS,
     SUPPORT_AGENT_NAME,
     SUPPORT_AGENT_SYSTEM_PROMPT,
     SUPPORT_AGENT_VERSION,
-    support_enablement_agent,
+    build_support_enablement_agent,
 )
 from enablement_agents.support.tools import (
     SUPPORT_MCP_SERVER_NAME,
@@ -105,7 +106,7 @@ class SupportEnablementAgent(EnablementAgentBase):
 
     @property
     def agent_definition(self) -> AgentDefinition:
-        return support_enablement_agent
+        return build_support_enablement_agent()
 
     # ------------------------------------------------------------------
     # produce_plan
@@ -206,7 +207,7 @@ class SupportEnablementAgent(EnablementAgentBase):
             },
             hooks=_build_hooks(),
             cwd=str(_REPO_ROOT),
-            model="claude-sonnet-4-6",
+            model=resolve_role_agent_model(),
         )
 
         async for message in query(prompt=prompt, options=options):

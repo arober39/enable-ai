@@ -185,6 +185,7 @@ async def run_coordinator(request: str) -> CoordinatorRunResult:
     # Every role enablement agent shares lookup_tool_capability. The
     # server keeps the historical "support" name so the qualified tool
     # (`mcp__support__lookup_tool_capability`) stays stable.
+    from enablement_agents.role_agent import resolve_role_agent_model
     from enablement_agents.support.tools import (  # local import to avoid cycle
         SUPPORT_MCP_SERVER_NAME,
         build_support_mcp_server,
@@ -200,7 +201,8 @@ async def run_coordinator(request: str) -> CoordinatorRunResult:
         cwd=str(_REPO_ROOT),
         # Pin a shipped model. User-level Claude settings can carry a broken
         # default (e.g. `fable[1m]`) that makes the bundled CLI fail immediately.
-        model="claude-sonnet-4-6",
+        # Same knob as the role planners: Opus 5.5 unless ENABLEMENT_AGENT_MODEL is set.
+        model=resolve_role_agent_model(),
     )
 
     coordinator_session_id: str | None = None
