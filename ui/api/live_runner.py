@@ -43,18 +43,29 @@ from core.identity import UserContext
 from core.plan_grounding import apply_tool_grounding
 from core.roles import Role
 from core.tool_catalog import ToolCapability, load_tool
+from enablement_agents.role_agent import resolve_role_agent_model
 
 logger = logging.getLogger(__name__)
 
 _REPO_ROOT: Path = Path(__file__).resolve().parents[2]
 
-#: Model used for live UI runs. Haiku is ~2x faster than Sonnet for this
-#: structured-output task, with similar plan quality on a 4-tool stack.
-#: The CLI/SDK path still defaults to whatever the agent definition pins —
-#: this override is UI-only. Set UI_LIVE_MODEL=claude-sonnet-4-5-20250929
-#: (or another id) if you want slower-but-deeper reasoning.
-_DEFAULT_MODEL = "claude-haiku-4-5-20251001"
+#: Optional UI-only override. When set and non-empty, it wins over
+#: ENABLEMENT_AGENT_MODEL for this module only. Unset, the live plan uses
+#: the shared planner model (Opus 5.5, or ENABLEMENT_AGENT_MODEL).
+_UI_LIVE_MODEL_ENV = "UI_LIVE_MODEL"
 _MAX_TOKENS = 4096
+
+
+def resolve_live_plan_model() -> str:
+    """Model id for the UI live enablement plan (steps 4 and 5).
+
+    Resolution: ``UI_LIVE_MODEL`` if set and non-empty, else the shared
+    enablement planner model (``ENABLEMENT_AGENT_MODEL``, else Opus 5.5).
+    """
+    ui_override = os.environ.get(_UI_LIVE_MODEL_ENV, "").strip()
+    if ui_override:
+        return ui_override
+    return resolve_role_agent_model()
 
 
 def _gather_catalog_context(tools: list[str], user: UserContext) -> str:
@@ -300,7 +311,7 @@ async def run_live_plan(
     plan_schema = EnablementPlan.model_json_schema()
 
     client = AsyncAnthropic()
-    model = os.environ.get("UI_LIVE_MODEL", _DEFAULT_MODEL)
+    model = resolve_live_plan_model()
     logger.info(
         "live runner: model=%s role=%s tools=%s session=%s",
         model,

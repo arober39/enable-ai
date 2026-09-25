@@ -18,6 +18,7 @@ keeps working for support and for every other role.
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from claude_agent_sdk import AgentDefinition
@@ -30,7 +31,31 @@ from enablement_agents.support.tools import (
 )
 
 ROLE_AGENT_VERSION = "0.1.0"
-ROLE_AGENT_MODEL = "claude-sonnet-4-6"
+
+#: Env var that overrides the enablement planner model. Non-empty wins.
+#: Blank or unset falls through to ``ROLE_AGENT_MODEL``.
+ENABLEMENT_AGENT_MODEL_ENV = "ENABLEMENT_AGENT_MODEL"
+
+#: Default planner model for role enablement agents. Opus 5.5 for plan
+#: quality. Set ENABLEMENT_AGENT_MODEL=claude-sonnet-4-6 for cheaper
+#: iterative testing. The SDK id follows the same undated pattern as
+#: ``claude-sonnet-4-6`` and ``claude-opus-4-8`` elsewhere in this repo.
+ROLE_AGENT_MODEL = "claude-opus-5-5"
+
+
+def resolve_role_agent_model() -> str:
+    """Return the model id role enablement planners should run.
+
+    Resolution order: ``ENABLEMENT_AGENT_MODEL`` when set and non-empty
+    (surrounding whitespace is ignored), otherwise ``ROLE_AGENT_MODEL``.
+    Read at call time so a process restart with a new env value is enough —
+    no code change.
+    """
+    override = os.environ.get(ENABLEMENT_AGENT_MODEL_ENV, "").strip()
+    if override:
+        return override
+    return ROLE_AGENT_MODEL
+
 
 #: Built-in Claude Code tools every role enablement agent may use.
 ROLE_AGENT_BASE_TOOLS: list[str] = [
@@ -214,7 +239,7 @@ def role_enablement_agent(role: Role) -> AgentDefinition:
         prompt=_build_role_prompt(role),
         tools=[*ROLE_AGENT_BASE_TOOLS, *ROLE_AGENT_MCP_TOOLS],
         mcpServers=ROLE_AGENT_MCP_SERVERS,
-        model=ROLE_AGENT_MODEL,
+        model=resolve_role_agent_model(),
     )
 
 
