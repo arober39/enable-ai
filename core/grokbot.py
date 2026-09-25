@@ -31,7 +31,7 @@ from core.grokbot_roster import (
     remember_bot,
 )
 from core.identity import UserContext, local_user
-from core.jev import CHOICE_FLOOR, JEV_CRED, decide
+from core.jev import CHOICE_FLOOR, JEV_CRED, TYPESAFE_CRED, decide
 from core.role_catalog import normalize_role_id
 from core.roles import list_roles
 
@@ -80,19 +80,25 @@ class GrokbotHandoff(BaseModel):
 
 
 class HandoffCredentials(Credentials):
-    """Settings first, then the process environment, then the repo `.env` file."""
+    """Process environment, then the repo `.env` file, then Settings.
+
+    `TYPESAFE_API_KEY` and `JEV_API_KEY` are never taken from Settings.
+    They belong in `.env`.
+    """
 
     def __init__(self, store: Credentials) -> None:
         self._store = store
 
     def get(self, key: str) -> str | None:
-        stored = self._store.get(key)
-        if stored:
-            return stored
         env = os.environ.get(key)
         if env:
             return env
-        return _file_env().get(key)
+        from_file = _file_env().get(key)
+        if from_file:
+            return from_file
+        if key in {JEV_CRED, TYPESAFE_CRED}:
+            return None
+        return self._store.get(key)
 
 
 def _file_env() -> dict[str, str]:
@@ -148,8 +154,11 @@ def _plain_reason(reason: str | None) -> str:
         return "no decision"
     if reason == "low_confidence":
         return "low confidence"
-    if reason == f"missing credential: {JEV_CRED}":
-        return f"missing {JEV_CRED} — add it in Settings or .env"
+    if reason in {
+        f"missing credential: {TYPESAFE_CRED}",
+        f"missing credential: {JEV_CRED}",
+    }:
+        return f"missing {TYPESAFE_CRED} — add it to .env"
     return reason
 
 

@@ -126,6 +126,11 @@ class LocalFileCredentialStore(CredentialStore):
             del data[key]
             self._write(data)
 
+    def clear(self) -> None:
+        """Remove every stored key. The UI server does this on each boot."""
+        if self._path.exists():
+            self._write({})
+
     def list_keys(self) -> list[str]:
         return sorted(self._read().keys())
 

@@ -46,7 +46,10 @@ class NativeAIFeature(BaseModel):
         description="ga / beta / preview / deprecated / unknown"
     )
     coverage: str = Field(
-        description="low / medium / high / unknown — how much of the capability surface this feature covers"
+        description=(
+            "low / medium / high / unknown — how much of the capability "
+            "surface this feature covers"
+        )
     )
 
 
@@ -226,6 +229,20 @@ def load_tool(user: UserContext, name: str) -> ToolCapability | None:
 def is_known(user: UserContext, name: str) -> bool:
     """True if the tool exists in the user's cache or the seed catalog."""
     return load_tool(user, name) is not None
+
+
+def list_researched_tools(user: UserContext) -> list[ToolCapability]:
+    """Return only this user's researched tools, sorted by vendor.
+
+    Seed files stay on disk for the factory. The picker does not list them.
+    """
+    out: list[ToolCapability] = []
+    for name in _cached_names(user):
+        cap = _load_cached(user, name)
+        if cap is not None:
+            out.append(cap)
+    out.sort(key=lambda c: c.vendor.lower())
+    return out
 
 
 def list_tools(user: UserContext) -> list[ToolCapability]:

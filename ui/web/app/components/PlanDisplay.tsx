@@ -86,57 +86,13 @@ export default function PlanDisplay({ response }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-neutral-500">
           {plan.recommendations.length} recommendation(s) ready —
-          pick one to build below.
+          pick one to hand to Grokbot.
         </p>
         <SpeakButton
           label="Listen to recommendations"
           text={recommendationsSpeech(plan)}
         />
       </div>
-
-      {plan.orchestrator_pr_plan && (
-        <section>
-          <h3 className="mb-2 text-base font-semibold">Orchestrator PR plan</h3>
-          <div className="rounded-md border border-neutral-200 bg-white p-3 text-sm">
-            <div>
-              <span className="font-medium">Branch:</span>{" "}
-              <span className="font-mono">
-                {plan.orchestrator_pr_plan.branch}
-              </span>
-            </div>
-            <div className="mt-2">
-              <span className="font-medium">MCP servers used:</span>{" "}
-              {plan.orchestrator_pr_plan.mcp_servers_used.join(", ") || "—"}
-            </div>
-            <div>
-              <span className="font-medium">MCP servers to generate:</span>{" "}
-              {plan.orchestrator_pr_plan.mcp_servers_to_generate.join(", ") ||
-                "—"}
-            </div>
-            <div>
-              <span className="font-medium">AI Configs:</span>{" "}
-              {plan.orchestrator_pr_plan.ai_configs_to_create.join(", ") || "—"}
-            </div>
-            <div>
-              <span className="font-medium">Env vars required:</span>{" "}
-              <span className="font-mono text-xs">
-                {plan.orchestrator_pr_plan.env_vars_required.join(", ")}
-              </span>
-            </div>
-            <details className="mt-2">
-              <summary className="cursor-pointer text-xs text-neutral-600">
-                {plan.orchestrator_pr_plan.files_to_create.length} files to
-                create
-              </summary>
-              <ul className="mt-1 list-inside list-disc font-mono text-xs text-neutral-600">
-                {plan.orchestrator_pr_plan.files_to_create.map((f) => (
-                  <li key={f}>{f}</li>
-                ))}
-              </ul>
-            </details>
-          </div>
-        </section>
-      )}
 
       <details className="text-xs">
         <summary className="cursor-pointer text-neutral-500">

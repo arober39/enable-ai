@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Spinner from "./Spinner";
 
 interface Props {
   demoMode: boolean;
+  startedAt: number | null;
+  onStop: () => void;
 }
 
 /** Prominent "in-progress" panel shown while a run is in flight.
@@ -17,16 +19,19 @@ interface Props {
  *  Different copy for demo vs. live mode so the user has a sense of how
  *  long to expect.
  */
-export default function LoadingPanel({ demoMode }: Props) {
-  const [elapsedMs, setElapsedMs] = useState(0);
+export default function LoadingPanel({ demoMode, startedAt, onStop }: Props) {
+  const mountedAt = useRef(Date.now());
+  const origin = startedAt ?? mountedAt.current;
+  const [elapsedMs, setElapsedMs] = useState(() =>
+    Math.max(0, Date.now() - origin),
+  );
 
   useEffect(() => {
-    const start = Date.now();
-    const interval = setInterval(() => {
-      setElapsedMs(Date.now() - start);
-    }, 100);
+    const tick = () => setElapsedMs(Math.max(0, Date.now() - origin));
+    tick();
+    const interval = setInterval(tick, 100);
     return () => clearInterval(interval);
-  }, []);
+  }, [origin]);
 
   return (
     <div
@@ -38,7 +43,7 @@ export default function LoadingPanel({ demoMode }: Props) {
         <Spinner className="h-7 w-7 text-accent" />
         <div className="flex-1">
           <h3 className="font-semibold text-ink">
-            Running Support Enablement Agent…
+            Running Enablement Agent…
           </h3>
           <p className="mt-1 text-sm text-neutral-700">
             {demoMode ? (
@@ -52,11 +57,20 @@ export default function LoadingPanel({ demoMode }: Props) {
             )}
           </p>
         </div>
-        <div
-          className="font-mono text-3xl tabular-nums text-accent"
-          aria-label={`${(elapsedMs / 1000).toFixed(1)} seconds elapsed`}
-        >
-          {(elapsedMs / 1000).toFixed(1)}s
+        <div className="flex items-center gap-3">
+          <div
+            className="font-mono text-3xl tabular-nums text-accent"
+            aria-label={`${(elapsedMs / 1000).toFixed(1)} seconds elapsed`}
+          >
+            {(elapsedMs / 1000).toFixed(1)}s
+          </div>
+          <button
+            type="button"
+            onClick={onStop}
+            className="rounded-md border border-rose-300 bg-white px-3 py-1.5 text-sm font-semibold text-rose-700 hover:bg-rose-50"
+          >
+            Stop
+          </button>
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import type { ArtifactKind, EnablementResponse } from "./types";
+import type { EnablementResponse } from "./types";
 
 export const SESSION_KEY = "enable-ai-home-session";
 const PENDING_TOOLS_KEY = "enable-ai-pending-tools";
@@ -9,10 +9,10 @@ export type HomeSession = {
   selected: string[];
   selectedRole: string | null;
   result: EnablementResponse | null;
-  keysReady: boolean;
-  lastArtifactKind: ArtifactKind | null;
-  buildVersion: number;
   selectedRecommendationId?: string | null;
+  enablementJobId?: string | null;
+  enablementStartedAt?: number | null;
+  buildJobId?: string | null;
 };
 
 export function writePendingKeys(keys: string[]): void {
@@ -46,7 +46,7 @@ export function writePendingTools(tools: string[]): void {
   localStorage.setItem(PENDING_TOOLS_KEY, JSON.stringify(tools));
 }
 
-/** Tools whose keys the workflow is waiting on. Shared across tabs, with this tab's session as a fallback. */
+/** Tool names a previous page left for Settings. The handoff does not add to this list. */
 export function readPendingTools(): string[] {
   if (typeof window === "undefined") return [];
   try {
@@ -61,8 +61,6 @@ export function readPendingTools(): string[] {
   } catch {
     // Fall through to this tab's workflow session.
   }
-  const session = readSession();
-  if (session?.result && !session.keysReady) return session.selected;
   return [];
 }
 

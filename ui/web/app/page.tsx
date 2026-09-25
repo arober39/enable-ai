@@ -1,39 +1,37 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import BuildOrchestrator from "./components/BuildOrchestrator";
-import CredentialGate from "./components/CredentialGate";
 import GrokbotHandoff from "./components/GrokbotHandoff";
 import LoadingPanel from "./components/LoadingPanel";
 import PlanDisplay from "./components/PlanDisplay";
 import RolePicker from "./components/RolePicker";
-import RunInquiryPanel from "./components/RunInquiryPanel";
 import SavedRecommendations from "./components/SavedRecommendations";
 import Spinner from "./components/Spinner";
 import ToolPicker from "./components/ToolPicker";
 import {
   ApiError,
+  cancelJob,
   deleteCachedRole,
   deleteCachedTool,
   fetchHealth,
-  getDeclaredStack,
-  getPreferences,
+  fetchJob,
   listRoles,
   listSavedRecommendations,
   listTools,
   researchRole,
   researchTool,
-  runEnablement,
   setSelectedRole,
+  startEnablementJob,
 } from "./lib/api";
 import {
   readSession,
   SESSION_KEY,
+  writePendingKeys,
   writePendingTools,
   type HomeSession,
 } from "./lib/homeSession";
 import type {
-  ArtifactKind,
   EnablementResponse,
   RoleSummary,
   SavedRecommendation,
@@ -41,8 +39,6 @@ import type {
 } from "./lib/types";
 
 export default function Home() {
-  const skipStackSelect = useRef(false);
-  const planStale = useRef(false);
   const [sessionReady, setSessionReady] = useState(false);
   const [tools, setTools] = useState<ToolSummary[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -50,55 +46,50 @@ export default function Home() {
   const [selectedRole, setSelectedRoleState] = useState<string | null>(null);
   const [savedRecs, setSavedRecs] = useState<SavedRecommendation[]>([]);
   const [result, setResult] = useState<EnablementResponse | null>(null);
-  // The artifact kind from the most recent successful build, or null
-  // if no build has happened (or last attempt failed). Step 6 (Send an
-  // inquiry) shows only when this is "workflow" — setup guides and
-  // migration plans don't have a runtime to call.
-  const [lastArtifactKind, setLastArtifactKind] = useState<ArtifactKind | null>(null);
-  // Incremented after each successful workflow build. Used as a React
-  // `key` on RunInquiryPanel so it remounts and re-fetches the freshly
-  // persisted workflow's sample_request.
-  const [buildVersion, setBuildVersion] = useState(0);
-  const [keysReady, setKeysReady] = useState(false);
   const [selectedRecommendationId, setSelectedRecommendationId] = useState<
     string | null
   >(null);
 
-  const handleBuilt = (kind: ArtifactKind | null) => {
-    setLastArtifactKind(kind);
-    // Only bump buildVersion (which forces RunInquiryPanel to refetch)
-    // when a runtime workflow was actually built. Other artifact kinds
-    // don't change what the panel would display.
-    if (kind === "workflow") {
-      setBuildVersion((v) => v + 1);
-    }
-  };
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [enablementJobId, setEnablementJobId] = useState<string | null>(null);
+  const [enablementStartedAt, setEnablementStartedAt] = useState<number | null>(
+    null,
+  );
+  const [buildJobId, setBuildJobId] = useState<string | null>(null);
   const [health, setHealth] = useState<{
     demo_mode: boolean;
     has_anthropic_key: boolean;
     boot_id: string;
   } | null>(null);
-  const [catalogReady, setCatalogReady] = useState(false);
 
   useEffect(() => {
     const saved = readSession();
     fetchHealth()
       .then((report) => {
         setHealth(report);
-        if (!saved) return;
-        skipStackSelect.current = true;
-        planStale.current = Boolean(
-          saved.bootId && report.boot_id && saved.bootId !== report.boot_id,
-        );
-        setSelected(new Set(saved.selected));
-        setSelectedRoleState(saved.selectedRole);
-        setResult(saved.result);
-        setKeysReady(saved.keysReady);
-        setLastArtifactKind(saved.lastArtifactKind);
-        setBuildVersion(saved.buildVersion);
-        setSelectedRecommendationId(saved.selectedRecommendationId ?? null);
+        const sameServer =
+          Boolean(saved?.bootId) && saved?.bootId === report.boot_id;
+        if (saved && sameServer) {
+          setSelected(new Set(saved.selected));
+          setSelectedRoleState(saved.selectedRole);
+          setResult(saved.result);
+          setSelectedRecommendationId(saved.selectedRecommendationId ?? null);
+          setEnablementJobId(saved.enablementJobId ?? null);
+          setEnablementStartedAt(saved.enablementStartedAt ?? null);
+          setBuildJobId(saved.buildJobId ?? null);
+          if (saved.enablementJobId) setLoading(true);
+          return;
+        }
+        setSelected(new Set());
+        setSelectedRoleState(null);
+        setResult(null);
+        setSelectedRecommendationId(null);
+        setEnablementJobId(null);
+        setEnablementStartedAt(null);
+        setBuildJobId(null);
+        writePendingTools([]);
+        writePendingKeys([]);
       })
       .catch(() => setHealth(null))
       .finally(() => setSessionReady(true));
@@ -108,22 +99,14 @@ export default function Home() {
     listTools()
       .then((data) => {
         setTools(data);
-        setCatalogReady(true);
       })
       .catch((e: Error) => setError(e.message));
-    Promise.all([listRoles(), getPreferences()])
-      .then(([roleList, prefs]) => {
-        setRoles(roleList);
-        setSelectedRoleState((current) => current ?? prefs.selected_role);
-      })
+    listRoles()
+      .then(setRoles)
       .catch((e: Error) => setError(e.message));
     refreshSaved();
   }, []);
 
-  // Selecting a role selects that department's declared stack. A researched
-  // role with no stack file 404s: clear the tool selection so the user can
-  // type their own tools, and do not surface that 404. Manual toggles after
-  // a successful load stay until the role changes again.
   useEffect(() => {
     if (!sessionReady || !health?.boot_id) return;
     const payload: HomeSession = {
@@ -131,53 +114,24 @@ export default function Home() {
       selected: Array.from(selected),
       selectedRole,
       result,
-      keysReady,
-      lastArtifactKind,
-      buildVersion,
       selectedRecommendationId,
+      enablementJobId,
+      enablementStartedAt,
+      buildJobId,
     };
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(payload));
-    writePendingTools(result && !keysReady ? Array.from(selected) : []);
+    writePendingTools([]);
   }, [
     sessionReady,
     health,
     selected,
     selectedRole,
     result,
-    keysReady,
-    lastArtifactKind,
-    buildVersion,
     selectedRecommendationId,
+    enablementJobId,
+    enablementStartedAt,
+    buildJobId,
   ]);
-
-  useEffect(() => {
-    if (!selectedRole || !catalogReady) return;
-    if (skipStackSelect.current) {
-      skipStackSelect.current = false;
-      return;
-    }
-    let cancelled = false;
-    getDeclaredStack(selectedRole)
-      .then((stack) => {
-        if (cancelled) return;
-        const known = new Set(tools.map((tool) => tool.name));
-        setSelected(new Set(stack.tools.filter((name) => known.has(name))));
-      })
-      .catch((e: unknown) => {
-        if (cancelled) return;
-        if (e instanceof ApiError && e.status === 404) {
-          setSelected(new Set());
-          return;
-        }
-        setError(e instanceof Error ? e.message : String(e));
-      });
-    return () => {
-      cancelled = true;
-    };
-    // tools is read once the catalog has loaded; later research must not
-    // wipe a user's toggles.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedRole, catalogReady]);
 
   const refreshSaved = () => {
     listSavedRecommendations()
@@ -187,26 +141,16 @@ export default function Home() {
       });
   };
 
-  const dropStalePlan = () => {
-    if (!planStale.current) return;
-    planStale.current = false;
-    setResult(null);
-    setKeysReady(false);
-    setLastArtifactKind(null);
-    setBuildVersion(0);
-    setSelectedRecommendationId(null);
-  };
-
   const onRoleChange = (roleId: string) => {
-    dropStalePlan();
+    if (roleId === selectedRole) {
+      setSelectedRoleState(null);
+      return;
+    }
     setSelectedRoleState(roleId);
-    // Persist asynchronously; surface failures via the error pane but don't
-    // block the optimistic UI update — the picker should feel instant.
     setSelectedRole(roleId).catch((e: Error) => setError(e.message));
   };
 
   const onResearch = async (name: string) => {
-    dropStalePlan();
     const added = await researchTool(name);
     setTools((prev) => {
       const next = prev.filter((t) => t.name !== added.name);
@@ -217,19 +161,16 @@ export default function Home() {
     setSelected((prev) => new Set(prev).add(added.name));
   };
 
-  const onResearchRole = async (name: string) => {
-    const added = await researchRole(name);
-    setRoles((prev) => {
-      const next = prev.filter((r) => r.id !== added.id);
-      next.push(added);
-      return next;
-    });
-    onRoleChange(added.id);
+  const onResearchRole = async (name: string, roleId?: string) => {
+    const added = await researchRole(name, roleId);
+    setRoles(await listRoles());
+    setSelectedRoleState(added.id);
+    setSelectedRole(added.id).catch((e: Error) => setError(e.message));
   };
 
   const onDeleteCachedRole = async (id: string) => {
     await deleteCachedRole(id);
-    setRoles((prev) => prev.filter((r) => r.id !== id));
+    setRoles(await listRoles());
     setSelectedRoleState((current) => (current === id ? null : current));
   };
 
@@ -244,7 +185,6 @@ export default function Home() {
   };
 
   const toggle = (name: string) => {
-    dropStalePlan();
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(name)) next.delete(name);
@@ -257,18 +197,80 @@ export default function Home() {
     setLoading(true);
     setError(null);
     setResult(null);
-    setKeysReady(false);
     setSelectedRecommendationId(null);
+    setBuildJobId(null);
     try {
-      const resp = await runEnablement(
+      const job = await startEnablementJob(
         Array.from(selected),
         selectedRole ?? undefined,
       );
-      setResult(resp);
+      setEnablementJobId(job.id);
+      setEnablementStartedAt(Date.parse(job.started_at));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
       setLoading(false);
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  useEffect(() => {
+    if (!enablementJobId) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const job = await fetchJob<EnablementResponse>(enablementJobId);
+        if (cancelled) return;
+        if (job.status === "running") {
+          const started = Date.parse(job.started_at);
+          if (!Number.isNaN(started)) setEnablementStartedAt(started);
+          return;
+        }
+        setEnablementJobId(null);
+        setEnablementStartedAt(null);
+        setLoading(false);
+        if (job.status === "cancelled") return;
+        if (job.status === "done" && job.result) {
+          const plan = job.result;
+          setResult(plan);
+          const ids = new Set(plan.plan.recommendations.map((rec) => rec.id));
+          setSelectedRecommendationId((current) =>
+            current && ids.has(current)
+              ? current
+              : (plan.plan.recommendations[0]?.id ?? null),
+          );
+        } else setError(job.error ?? "Enablement run failed.");
+      } catch (e) {
+        if (cancelled) return;
+        if (e instanceof ApiError && e.status === 404) {
+          setEnablementJobId(null);
+          setEnablementStartedAt(null);
+          setLoading(false);
+          setError("The backend stopped, so this run did not finish.");
+        }
+      }
+    };
+    const timer = setInterval(tick, 1000);
+    void tick();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void tick();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [enablementJobId]);
+
+  const stopEnablement = async () => {
+    const jobId = enablementJobId;
+    setEnablementJobId(null);
+    setEnablementStartedAt(null);
+    setLoading(false);
+    if (!jobId) return;
+    try {
+      await cancelJob(jobId);
+    } catch {
+      // The poller also treats a missing job as finished.
     }
   };
 
@@ -286,9 +288,8 @@ export default function Home() {
       <header>
         <h1 className="text-2xl font-bold">Enable AI — test UI</h1>
         <p className="mt-1 text-sm text-neutral-600">
-          Pick a role. Its declared stack is selected. The Enablement Agent
-          proposes recommendations; pick one to install a runtime you can
-          run and measure.
+          Pick a role, then search for the tools you want. The Enablement Agent
+          proposes recommendations; pick one to hand to a Grokbot.
         </p>
         {health && (
           <p className="mt-2 text-xs text-neutral-500">
@@ -379,7 +380,11 @@ export default function Home() {
       {loading && (
         <section>
           <h2 className="mb-3 text-base font-semibold">4. In progress</h2>
-          <LoadingPanel demoMode={!!health?.demo_mode} />
+          <LoadingPanel
+            demoMode={!!health?.demo_mode}
+            startedAt={enablementStartedAt}
+            onStop={stopEnablement}
+          />
         </section>
       )}
 
@@ -390,68 +395,44 @@ export default function Home() {
         </section>
       )}
 
-      {result && !loading && !keysReady && (
-        <section>
-          <h2 className="mb-3 text-base font-semibold">5. Add credentials</h2>
-          <CredentialGate
-            tools={Array.from(selected)}
-            onConfirmed={() => setKeysReady(true)}
-          />
-        </section>
-      )}
-
-      {result && !loading && selectedRole && keysReady && (
+      {result && !loading && selectedRole && (
         <section>
           <h2 className="mb-3 text-base font-semibold">
-            6. Pick one recommendation and build
+            5. Pick one recommendation
           </h2>
           <p className="mb-3 text-sm text-neutral-700">
-            Orchestrate and augment recommendations install a{" "}
-            <code className="rounded bg-neutral-100 px-1 py-0.5 font-mono text-xs">
-              WorkflowDefinition
-            </code>{" "}
-            the interpreter runs. Native-AI recommendations become a setup
-            guide. Consolidations become a migration plan. Other
-            recommendations can be parked for later.
+            Pick the recommendation to hand to Grokbot. Grok Bot does the work.
           </p>
           <BuildOrchestrator
             plan={result.plan}
             roleId={selectedRole}
             selectedTools={Array.from(selected)}
-            selectedRecommendationId={pickedRecommendation?.id ?? null}
+            selectedRecommendationId={selectedRecommendationId}
             onSelectRecommendation={setSelectedRecommendationId}
             onSaved={refreshSaved}
-            onBuilt={handleBuilt}
           />
         </section>
       )}
 
-      {result && !loading && selectedRole && keysReady && pickedRecommendation && (
+      {result && !loading && selectedRole && pickedRecommendation && (
         <section>
-          <h2 className="mb-3 text-base font-semibold">7. Hand this to Grokbot</h2>
+          <h2 className="mb-3 text-base font-semibold">
+            6. Hand {pickedRecommendation.id} to Grokbot
+          </h2>
           <GrokbotHandoff
+            key={pickedRecommendation.id}
             recommendation={pickedRecommendation}
             roleName={roleName}
             roleId={selectedRole}
-            tools={Array.from(selected)}
+            tools={
+              pickedRecommendation.tools_affected.length > 0
+                ? pickedRecommendation.tools_affected
+                : Array.from(selected)
+            }
           />
         </section>
       )}
 
-      {result && !loading && lastArtifactKind === "workflow" && (
-        <section>
-          <h2 className="mb-3 text-base font-semibold">8. Send an inquiry</h2>
-          <p className="mb-3 text-xs text-neutral-500">
-            Shown only because the most recent build produced a runtime
-            workflow. If you build a setup guide or migration plan next,
-            this section will hide — those kinds don't have a runtime to
-            call.
-          </p>
-          {/* `key` changes on each workflow build → remounts the panel
-              → its useEffect re-fetches the latest workflow's sample. */}
-          <RunInquiryPanel key={buildVersion} />
-        </section>
-      )}
     </main>
   );
 }

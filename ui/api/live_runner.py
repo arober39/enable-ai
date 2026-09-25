@@ -127,13 +127,15 @@ Compare the declared stack against these {len(role.capabilities)} AI-enabled {ro
 
 {cap_bullet_list}
 
-For each capability decide: covered, partial, gap, or redundant — based on the tool catalog data above.
+For each capability decide a status of covered, partial, gap, or redundant — based on the tool catalog data above. Those four words belong only in `capability_coverage.status`.
 
-Then translate findings into recommendations. Each recommendation has a `kind`:
+Then translate findings into recommendations. Each recommendation `kind` must be exactly one of these four strings:
 - `use_native_ai` — only when the native feature is genuinely sufficient with no augmentation
 - `augment_with_custom_ai` — when native AI covers something but doesn't see cross-tool data
 - `consolidate` — when two tools redundantly cover the same capability
-- `orchestrate` — when value comes from composing multiple tools
+- `orchestrate` — when value comes from composing multiple tools, including a capability whose status is gap
+
+Never set recommendation `kind` to covered, partial, gap, or redundant.
 
 Set a high bar for `use_native_ai`. Default toward `augment_with_custom_ai` or `orchestrate` when the value is multi-tool.
 
@@ -209,6 +211,37 @@ def _unwrap_envelope(args: dict[str, Any]) -> dict[str, Any]:
                 sole_key,
             )
             return args[sole_key]
+    return args
+
+
+_VALID_KINDS = frozenset(
+    {"use_native_ai", "augment_with_custom_ai", "consolidate", "orchestrate"}
+)
+# Coverage words the model sometimes copies into recommendation.kind.
+_KIND_FROM_STATUS = {
+    "gap": "orchestrate",
+    "partial": "augment_with_custom_ai",
+    "covered": "use_native_ai",
+    "redundant": "consolidate",
+}
+
+
+def _coerce_recommendation_kinds(args: dict[str, Any]) -> dict[str, Any]:
+    """Map a coverage status used as recommendation.kind onto a real kind."""
+    recommendations = args.get("recommendations")
+    if not isinstance(recommendations, list):
+        return args
+    for rec in recommendations:
+        if not isinstance(rec, dict):
+            continue
+        kind = rec.get("kind")
+        if not isinstance(kind, str) or kind in _VALID_KINDS:
+            continue
+        mapped = _KIND_FROM_STATUS.get(kind.strip().lower())
+        if mapped is None:
+            continue
+        logger.warning("live runner: mapping recommendation kind %r to %r", kind, mapped)
+        rec["kind"] = mapped
     return args
 
 
@@ -305,7 +338,7 @@ async def run_live_plan(
             f"stop_reason={response.stop_reason}. preview: {debug}"
         )
 
-    args = _extract_submit_args(tool_uses)
+    args = _coerce_recommendation_kinds(_extract_submit_args(tool_uses))
     try:
         return EnablementPlan.model_validate(args)
     except Exception as exc:  # noqa: BLE001 — surface Pydantic error message

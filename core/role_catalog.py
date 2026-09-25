@@ -160,29 +160,50 @@ def delete_cached_role(user: UserContext, role_id: str) -> bool:
 
 
 def load_role_for_user(user: UserContext, role_id: str) -> Role:
-    """Return the role for this user. Seeded roles win over the cache.
+    """Return the role for this user. A researched card wins over the seed.
 
-    Raises KeyError when the id is neither seeded nor cached for `user`.
+    The seed file stays on disk. Raises KeyError when the id is neither
+    seeded nor cached for `user`.
     """
+    cached = _load_cached(user, role_id)
+    if cached is not None:
+        return role_from_card(cached)
     try:
         return load_role(role_id)
     except KeyError:
-        cached = _load_cached(user, role_id)
-        if cached is None:
-            raise KeyError(f"unknown role: {role_id}") from None
-        return role_from_card(cached)
+        raise KeyError(f"unknown role: {role_id}") from None
 
 
 def list_available_roles(user: UserContext) -> list[Role]:
     """Seeded roles plus this user's researched roles, sorted by display name.
 
-    When an id exists in both, the seeded role is returned.
+    A researched card replaces the seed for that user when the id matches,
+    or when the display name matches. The seed file stays on disk. Deleting
+    the researched card brings the seed back.
     """
-    by_id: dict[str, Role] = {role.id: role for role in list_roles()}
+    seeds = list(list_roles())
+    seed_ids = {role.id for role in seeds}
+    by_id: dict[str, Role] = {role.id: role for role in seeds}
     for role_id in _cached_ids(user):
-        if role_id in by_id:
-            continue
         cached = _load_cached(user, role_id)
         if cached is not None:
             by_id[role_id] = role_from_card(cached)
-    return sorted(by_id.values(), key=lambda role: role.display_name)
+
+    chosen: dict[str, Role] = {}
+    for role in by_id.values():
+        key = role.display_name.casefold()
+        current = chosen.get(key)
+        if current is None:
+            chosen[key] = role
+            continue
+        if current.source != "researched" and role.source == "researched":
+            chosen[key] = role
+            continue
+        if (
+            current.source == "researched"
+            and role.source == "researched"
+            and role.id in seed_ids
+            and current.id not in seed_ids
+        ):
+            chosen[key] = role
+    return sorted(chosen.values(), key=lambda role: role.display_name)

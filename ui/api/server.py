@@ -47,6 +47,7 @@ from __future__ import annotations
 import logging
 import os
 import uuid
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -111,7 +112,7 @@ from core.tool_catalog import (
     ToolCapability,
     delete_cached_tool,
     is_known,
-    list_tools,
+    list_researched_tools,
     load_tool,
     normalize_name,
 )
@@ -145,6 +146,7 @@ from enablement_agents.workflow_interpreter import (
     WorkflowRunResult,
     run_workflow,
 )
+from ui.api.jobs import Job, cancel_job, get_job, spawn, start_job
 from ui.api.live_runner import run_live_plan
 from ui.api.speech import SpeechUnavailable, resolve_speech_key, synthesize
 from ui.api.synthetic import build_synthetic_plan
@@ -158,10 +160,20 @@ REPO_ROOT: Path = Path(__file__).resolve().parents[2]
 # FastAPI app + CORS
 # ---------------------------------------------------------------------------
 
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    # Keys added in Settings belong to this process. A restart starts empty.
+    # Tests import this app; they must not wipe the developer's vault.
+    if not os.environ.get("PYTEST_CURRENT_TEST"):
+        LocalFileCredentialStore(local_user()).clear()
+    yield
+
+
 app = FastAPI(
     title="Enable AI — UI API",
     description="Backend for the Next.js test UI. Hosts the Support agent.",
     version="0.1.0",
+    lifespan=_lifespan,
 )
 
 # The Next.js dev server runs on 3000; CORS is permissive for local dev only.
@@ -286,7 +298,7 @@ def _mask(value: str) -> str:
 
 
 def _resolve_role(user: UserContext, role_id: str) -> Role:
-    """Seeded role, or this user's researched role. Seeded ids win."""
+    """Seeded role, or this user's researched card when one replaces it."""
     try:
         return load_role_for_user(user, role_id)
     except KeyError:
@@ -326,9 +338,9 @@ async def health() -> dict[str, Any]:
 
 @app.get("/api/tools", response_model=list[ToolSummary])
 async def get_tools() -> list[ToolSummary]:
-    """Return every tool available to the user — seed catalog + cached."""
+    """Return this user's researched tools. Seed files stay off the picker."""
     user = _current_user()
-    return [_to_tool_summary(c) for c in list_tools(user)]
+    return [_to_tool_summary(c) for c in list_researched_tools(user)]
 
 
 @app.post("/api/tools/research", response_model=ToolSummary)
@@ -432,6 +444,7 @@ class ResearchRoleRequest(BaseModel):
     """Body for POST /api/roles/research. Free-form job title."""
 
     name: str = Field(min_length=1, max_length=120)
+    role_id: str | None = None
 
 
 class SetRoleRequest(BaseModel):
@@ -455,7 +468,7 @@ def _role_to_summary(role: Role) -> RoleSummary:
 async def get_roles() -> list[RoleSummary]:
     """Return seeded roles plus this user's researched roles.
 
-    Seeded roles win when a researched id collides with the on-disk registry.
+    A researched card replaces the seed for that user. The seed file stays.
     """
     return [_role_to_summary(r) for r in list_available_roles(_current_user())]
 
@@ -474,7 +487,7 @@ async def research_new_role(req: ResearchRoleRequest) -> RoleSummary:
         raise HTTPException(400, str(exc)) from exc
 
     try:
-        role = await research_role(req.name, user)
+        role = await research_role(req.name, user, role_id=req.role_id)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     except RuntimeError as exc:
@@ -845,6 +858,71 @@ async def build_workflow_endpoint(
         result.artifact_kind,
     )
     return result
+
+
+class JobResponse(BaseModel):
+    """Poll body for a run that continues after the browser tab goes away."""
+
+    id: str
+    kind: Literal["enablement", "build"]
+    status: Literal["running", "done", "error", "cancelled"]
+    started_at: str
+    result: dict[str, Any] | None = None
+    error: str | None = None
+
+
+def _job_response(job: Job) -> JobResponse:
+    return JobResponse(
+        id=job.id,
+        kind=job.kind,
+        status=job.status,
+        started_at=job.started_at,
+        result=job.result,
+        error=job.error,
+    )
+
+
+@app.post("/api/jobs/enablement", response_model=JobResponse)
+async def start_enablement_job(req: EnablementRequest) -> JobResponse:
+    """Start an enablement run and return before it finishes."""
+    job = start_job("enablement")
+
+    async def _work() -> dict[str, Any]:
+        plan = await run_enablement(req)
+        return plan.model_dump(mode="json")
+
+    spawn(job.id, _work())
+    return _job_response(job)
+
+
+@app.post("/api/jobs/build", response_model=JobResponse)
+async def start_build_job(req: BuildWorkflowRequest) -> JobResponse:
+    """Start a workflow build and return before it finishes."""
+    job = start_job("build")
+
+    async def _work() -> dict[str, Any]:
+        built = await build_workflow_endpoint(req)
+        return built.model_dump(mode="json")
+
+    spawn(job.id, _work())
+    return _job_response(job)
+
+
+@app.post("/api/jobs/{job_id}/cancel", response_model=JobResponse)
+async def cancel_running_job(job_id: str) -> JobResponse:
+    """Stop an enablement run or a workflow build that is still in progress."""
+    job = cancel_job(job_id)
+    if job is None:
+        raise HTTPException(404, "Job not found. It ended when the server restarted.")
+    return _job_response(job)
+
+
+@app.get("/api/jobs/{job_id}", response_model=JobResponse)
+async def read_job(job_id: str) -> JobResponse:
+    job = get_job(job_id)
+    if job is None:
+        raise HTTPException(404, "Job not found. It ended when the server restarted.")
+    return _job_response(job)
 
 
 @app.get("/api/workflows", response_model=list[WorkflowDefinition])

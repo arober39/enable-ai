@@ -59,9 +59,6 @@ test.describe("Enable AI test UI", () => {
     await expect(
       page.getByRole("heading", { name: /Recommendations/i })
     ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: /Orchestrator PR plan/i })
-    ).toBeVisible();
 
     // Demo-mode badge
     await expect(page.getByText(/demo mode/i).first()).toBeVisible();

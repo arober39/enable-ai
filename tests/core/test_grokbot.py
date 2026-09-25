@@ -118,7 +118,7 @@ def test_missing_jev_key_says_so_and_defaults_to_a_new_bot(
     handoff = _sample_handoff(creds=_Creds({}))
     assert handoff.action == "create_fallback"
     assert handoff.placement.startswith("Jev did not choose a bot")
-    assert "JEV_API_KEY" in handoff.placement
+    assert "TYPESAFE_API_KEY" in handoff.placement
     assert "Create a new bot named R-003 Developer Relations." in handoff.placement
     assert "Jev recommends:" not in handoff.description
     assert handoff.description.startswith(handoff.placement)
@@ -289,7 +289,7 @@ def test_unreadable_roster_still_embeds_a_jev_recommendation(
     assert handoff.placement.startswith("Jev recommends: create a new bot named")
 
 
-def test_handoff_credentials_prefer_settings_then_env_then_file(
+def test_jev_key_comes_from_env_or_file_not_settings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("JEV_API_KEY", "from-env")
@@ -298,13 +298,19 @@ def test_handoff_credentials_prefer_settings_then_env_then_file(
         lambda: {"JEV_API_KEY": "from-file", "GROKBOT_GATEWAY_URL": "http://gw"},
     )
     assert HandoffCredentials(_Creds({"JEV_API_KEY": "from-settings"})).get("JEV_API_KEY") == (
-        "from-settings"
+        "from-env"
     )
-    assert HandoffCredentials(_Creds({})).get("JEV_API_KEY") == "from-env"
     monkeypatch.delenv("JEV_API_KEY")
-    layered = HandoffCredentials(_Creds({}))
+    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    layered = HandoffCredentials(_Creds({"JEV_API_KEY": "from-settings", "TYPESAFE_API_KEY": "settings-typesafe"}))
     assert layered.get("JEV_API_KEY") == "from-file"
+    assert layered.get("TYPESAFE_API_KEY") is None
     assert layered.get("GROKBOT_GATEWAY_URL") == "http://gw"
+    monkeypatch.setattr(
+        "core.grokbot._file_env",
+        lambda: {"TYPESAFE_API_KEY": "from-typesafe-file"},
+    )
+    assert layered.get("TYPESAFE_API_KEY") == "from-typesafe-file"
 
 
 def test_handoff_name_and_title_use_the_same_limits_as_the_gateway_writer() -> None:

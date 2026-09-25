@@ -1,7 +1,7 @@
 """Jev decisions for Enable AI.
 
 Jev answers typed questions about state the caller already has. It does
-not write plans or call tools. Missing `JEV_API_KEY`, an HTTP failure, or
+not write plans or call tools. Missing `TYPESAFE_API_KEY`, an HTTP failure, or
 a confidence below the floor falls back to a local heuristic and says so.
 A heuristic result is never labeled as a Jev decision.
 """
@@ -18,7 +18,10 @@ from core.credentials import Credentials
 logger = logging.getLogger(__name__)
 
 JEV_CRED = "JEV_API_KEY"
-DECIDE_URL = "https://jevtypesafeai.com/api/v1/decide"
+TYPESAFE_CRED = "TYPESAFE_API_KEY"
+#: `.env` uses the TypeSafe name. `JEV_API_KEY` still works.
+JEV_CRED_NAMES = (TYPESAFE_CRED, JEV_CRED)
+DECIDE_URL = "https://api.typesafe.ai/v1/systemone"
 MODEL = "jev-latest"
 CHOICE_FLOOR = 0.5
 #: Noul values inside this band are too close to call.
@@ -79,17 +82,28 @@ def _payload_text(payload: dict[str, Any] | None) -> str:
     return "\n".join(parts)
 
 
+def jev_token(creds: Credentials | None) -> str | None:
+    """TypeSafe key from the caller, then the older `JEV_API_KEY` name."""
+    if creds is None:
+        return None
+    for name in JEV_CRED_NAMES:
+        value = creds.get(name)
+        if value:
+            return value
+    return None
+
+
 def decide(
     state: Any,
     questions: dict[str, Any],
     creds: Credentials | None,
 ) -> dict[str, Any]:
-    """POST /v1/decide. Stub shape when the key is missing or the call fails."""
-    token = creds.get(JEV_CRED) if creds is not None else None
+    """POST TypeSafe /v1/systemone. Stub shape when the key is missing or the call fails."""
+    token = jev_token(creds)
     if not token:
         return {
             "mode": "stub",
-            "reason": f"missing credential: {JEV_CRED}",
+            "reason": f"missing credential: {TYPESAFE_CRED}",
             "answers": None,
         }
     try:

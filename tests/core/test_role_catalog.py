@@ -1,7 +1,7 @@
 """Deterministic tests for the per-user researched role cache.
 
 Writes only under tmp_path. No network, no LLM. Seeded roles on disk
-stay the source of truth when an id collides.
+stay on disk when an id collides. The user's researched card wins.
 """
 
 from __future__ import annotations
@@ -114,7 +114,7 @@ def test_cache_roundtrip(isolated_state: Path) -> None:
         load_role_for_user(other, "account_executive")
 
 
-def test_seed_roles_unchanged_and_win_on_collision(isolated_state: Path) -> None:
+def test_research_replaces_seed_for_the_user_only(isolated_state: Path) -> None:
     before = _seed_snapshot()
     user = _user()
     cache_role(
@@ -132,14 +132,33 @@ def test_seed_roles_unchanged_and_win_on_collision(isolated_state: Path) -> None
     assert seeded.source == "seed"
     assert seeded.display_name != "Not The Seeded Support Role"
     resolved = load_role_for_user(user, "support")
-    assert resolved.display_name == seeded.display_name
-    assert resolved.source == "seed"
-    assert resolved.directory is not None
+    assert resolved.display_name == "Not The Seeded Support Role"
+    assert resolved.source == "researched"
+    assert resolved.directory is None
 
     available = {role.id: role for role in list_available_roles(user)}
     assert "support" in available
-    assert available["support"].source == "seed"
+    assert available["support"].source == "researched"
     assert available["account_executive"].source == "researched"
+
+    duplicate = _user("cara")
+    cache_role(
+        duplicate,
+        _card(
+            id="customer_support",
+            department="customer_support",
+            display_name="Customer Support",
+            description="Researched copy of the seeded support role.",
+        ),
+    )
+    named = [
+        role
+        for role in list_available_roles(duplicate)
+        if role.display_name == "Customer Support"
+    ]
+    assert len(named) == 1
+    assert named[0].id == "customer_support"
+    assert named[0].source == "researched"
 
     seed_yaml = repo_root() / "enablement_agents" / "roles" / "support" / "role.yaml"
     assert seed_yaml.is_file()

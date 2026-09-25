@@ -8,12 +8,13 @@ interface Props {
   roles: RoleSummary[];
   selected: string | null;
   onSelect: (roleId: string) => void;
-  onResearch: (name: string) => Promise<void>;
+  onResearch: (name: string, roleId?: string) => Promise<void>;
   onDeleteCached: (id: string) => Promise<void>;
   disabled?: boolean;
 }
 
 const _MIN_QUERY = 2;
+const _PREVIEW_COUNT = 3;
 
 export default function RolePicker({
   roles,
@@ -25,6 +26,7 @@ export default function RolePicker({
 }: Props) {
   const [query, setQuery] = useState("");
   const [researching, setResearching] = useState(false);
+  const [researchingId, setResearchingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const q = query.trim().toLowerCase();
@@ -45,6 +47,19 @@ export default function RolePicker({
         r.id.toLowerCase() === q || r.display_name.toLowerCase() === q,
     );
   const canResearch = q.length >= _MIN_QUERY && !exactMatch && !researching;
+  const shown = q ? visible : visible.slice(0, _PREVIEW_COUNT);
+
+  const researchSeed = async (role: RoleSummary) => {
+    setResearchingId(role.id);
+    setError(null);
+    try {
+      await onResearch(role.display_name, role.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setResearchingId(null);
+    }
+  };
 
   const tryResearch = async () => {
     setResearching(true);
@@ -108,14 +123,14 @@ export default function RolePicker({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {visible.map((r) => {
+      <div className="grid grid-cols-1 items-stretch gap-2 sm:grid-cols-2">
+        {shown.map((r) => {
           const isActive = r.id === selected;
           return (
             <div
               key={r.id}
               className={
-                "flex items-start justify-between gap-3 rounded-lg border px-3 py-2 transition " +
+                "flex h-full items-start justify-between gap-3 rounded-lg border px-3 py-2 transition " +
                 (isActive
                   ? "border-accent bg-accent/5"
                   : "border-neutral-300 bg-white")
@@ -135,23 +150,28 @@ export default function RolePicker({
                     <span className="text-sm font-semibold">
                       {r.display_name}
                     </span>
-                    {r.source && (
-                      <span
-                        className={
-                          "rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide " +
-                          (r.source === "researched"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-neutral-100 text-neutral-600")
-                        }
-                      >
-                        {r.source}
+                    {r.source === "researched" && (
+                      <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-emerald-700">
+                        researched
                       </span>
                     )}
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-neutral-600">{r.description}</p>
+                <p className="mt-1 line-clamp-3 text-xs text-neutral-600">
+                  {r.description}
+                </p>
               </button>
               <div className="flex shrink-0 items-center gap-2">
+                {r.source === "seed" && (
+                  <button
+                    type="button"
+                    onClick={() => researchSeed(r)}
+                    disabled={disabled || researchingId === r.id}
+                    className="text-xs text-accent hover:underline"
+                  >
+                    {researchingId === r.id ? "Researching…" : "Research"}
+                  </button>
+                )}
                 {r.source === "researched" && (
                   <button
                     type="button"

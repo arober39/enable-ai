@@ -2,22 +2,12 @@ import type {
   CredentialRevealResponse,
   CredentialSummary,
   RequiredCredentials,
-  EnablementPlan,
   EnablementResponse,
-  GeneratorRunResult,
-  DeclaredStack,
-  OrchestratorResponse,
-  OutcomeRecord,
-  RecommendationMetrics,
   Recommendation,
   RoleSummary,
-  RunOrchestratorRequest,
   SavedRecommendation,
   ToolSummary,
   UserPreferences,
-  WorkflowDefinition,
-  BuildResult,
-  WorkflowRunResult,
 } from "./types";
 
 // In dev we call the FastAPI backend directly (CORS configured server-side
@@ -104,6 +94,35 @@ export function deleteCachedTool(name: string): Promise<{ removed: boolean }> {
   );
 }
 
+export type JobView<T> = {
+  id: string;
+  kind: "enablement" | "build";
+  status: "running" | "done" | "error" | "cancelled";
+  started_at: string;
+  result: T | null;
+  error: string | null;
+};
+
+export function startEnablementJob(
+  tools: string[],
+  role?: string,
+): Promise<JobView<EnablementResponse>> {
+  return fetchJson<JobView<EnablementResponse>>("/api/jobs/enablement", {
+    method: "POST",
+    body: JSON.stringify({ tools, ...(role ? { role } : {}) }),
+  });
+}
+
+export function fetchJob<T>(id: string): Promise<JobView<T>> {
+  return fetchJson<JobView<T>>(`/api/jobs/${encodeURIComponent(id)}`);
+}
+
+export function cancelJob<T>(id: string): Promise<JobView<T>> {
+  return fetchJson<JobView<T>>(`/api/jobs/${encodeURIComponent(id)}/cancel`, {
+    method: "POST",
+  });
+}
+
 export function runEnablement(
   tools: string[],
   role?: string,
@@ -118,10 +137,10 @@ export function listRoles(): Promise<RoleSummary[]> {
   return fetchJson<RoleSummary[]>("/api/roles");
 }
 
-export function researchRole(name: string): Promise<RoleSummary> {
+export function researchRole(name: string, roleId?: string): Promise<RoleSummary> {
   return fetchJson<RoleSummary>("/api/roles/research", {
     method: "POST",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, ...(roleId ? { role_id: roleId } : {}) }),
   });
 }
 
@@ -140,21 +159,6 @@ export function setSelectedRole(role: string): Promise<UserPreferences> {
   return fetchJson<UserPreferences>("/api/preferences/role", {
     method: "PUT",
     body: JSON.stringify({ role }),
-  });
-}
-
-export function generateOrchestrator(
-  plan: EnablementPlan,
-  selectedRecommendationId: string,
-  role?: string,
-): Promise<GeneratorRunResult> {
-  return fetchJson<GeneratorRunResult>("/api/generate-orchestrator", {
-    method: "POST",
-    body: JSON.stringify({
-      plan,
-      selected_recommendation_id: selectedRecommendationId,
-      ...(role ? { role } : {}),
-    }),
   });
 }
 
@@ -222,11 +226,6 @@ export async function synthesizeSpeech(text: string): Promise<Blob> {
   }
 }
 
-export function workflowCredentials(role?: string): Promise<RequiredCredentials> {
-  const query = role ? `?role=${encodeURIComponent(role)}` : "";
-  return fetchJson<RequiredCredentials>(`/api/credentials/for-workflow${query}`);
-}
-
 export function requiredCredentials(tools: string[]): Promise<RequiredCredentials> {
   const query = encodeURIComponent(tools.join(","));
   return fetchJson<RequiredCredentials>(`/api/credentials/required?tools=${query}`);
@@ -261,71 +260,6 @@ export function revealCredential(
   );
 }
 
-// ----- Run orchestrator -----
-
-export function runOrchestrator(
-  req: RunOrchestratorRequest,
-): Promise<OrchestratorResponse> {
-  return fetchJson<OrchestratorResponse>("/api/run-orchestrator", {
-    method: "POST",
-    body: JSON.stringify(req),
-  });
-}
-
-// ----- Phase 2.1 workflow endpoints (the new primary path) -----
-
-export function buildWorkflow(
-  plan: EnablementPlan,
-  selectedRecommendationId: string,
-  tools: string[],
-  role?: string,
-): Promise<BuildResult> {
-  return fetchJson<BuildResult>("/api/build-workflow", {
-    method: "POST",
-    body: JSON.stringify({
-      plan,
-      selected_recommendation_id: selectedRecommendationId,
-      tools,
-      ...(role ? { role } : {}),
-    }),
-  });
-}
-
-export function runWorkflow(
-  payload: Record<string, unknown>,
-  role?: string,
-): Promise<WorkflowRunResult> {
-  return fetchJson<WorkflowRunResult>("/api/run-workflow", {
-    method: "POST",
-    body: JSON.stringify({ payload, ...(role ? { role } : {}) }),
-  });
-}
-
-export function getDeclaredStack(roleId: string): Promise<DeclaredStack> {
-  return fetchJson<DeclaredStack>(`/api/stacks/${encodeURIComponent(roleId)}`);
-}
-
-export function listOutcomes(): Promise<OutcomeRecord[]> {
-  return fetchJson<OutcomeRecord[]>("/api/outcomes");
-}
-
-export function outcomeSummary(): Promise<RecommendationMetrics[]> {
-  return fetchJson<RecommendationMetrics[]>("/api/outcomes/summary");
-}
-
-export function rollbackRecommendation(
-  recommendationId: string,
-  role?: string,
-): Promise<OutcomeRecord> {
-  return fetchJson<OutcomeRecord>("/api/rollback", {
-    method: "POST",
-    body: JSON.stringify({
-      recommendation_id: recommendationId,
-      ...(role ? { role } : {}),
-    }),
-  });
-}
-
 export type GrokbotHandoffText = {
   name: string;
   title: string;
@@ -351,13 +285,3 @@ export function fetchGrokbotHandoff(args: {
   });
 }
 
-export function listWorkflows(): Promise<WorkflowDefinition[]> {
-  return fetchJson<WorkflowDefinition[]>("/api/workflows");
-}
-
-export function deleteWorkflow(roleId: string): Promise<{ removed: boolean }> {
-  return fetchJson<{ removed: boolean }>(
-    `/api/workflows/${encodeURIComponent(roleId)}`,
-    { method: "DELETE" },
-  );
-}

@@ -14,6 +14,7 @@ interface Props {
 }
 
 const _MIN_QUERY = 2;
+const _PREVIEW_COUNT = 3;
 
 export default function ToolPicker({
   tools,
@@ -43,6 +44,7 @@ export default function ToolPicker({
       (t) => t.name === q || t.vendor.toLowerCase() === q,
     );
   const canResearch = q.length >= _MIN_QUERY && !exactMatch && !researching;
+  const shown = q ? visible : visible.slice(0, _PREVIEW_COUNT);
 
   const tryResearch = async () => {
     setResearching(true);
@@ -124,12 +126,14 @@ export default function ToolPicker({
       <div className="rounded-lg border border-neutral-300 bg-white">
         {visible.length === 0 && !canResearch && (
           <div className="p-3 text-xs text-neutral-500">
-            No matching tools. Type at least {_MIN_QUERY} characters to research a new one.
+            {tools.length === 0
+              ? "No tools yet. Type a name to research it."
+              : `No matching tools. Type at least ${_MIN_QUERY} characters to research a new one.`}
           </div>
         )}
 
         <ul className="divide-y divide-neutral-200">
-          {visible.map((t) => {
+          {shown.map((t) => {
             const isSelected = selected.has(t.name);
             return (
               <li
@@ -144,16 +148,11 @@ export default function ToolPicker({
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">{t.vendor}</span>
-                    <span
-                      className={
-                        "rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide " +
-                        (t.source === "researched"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-neutral-100 text-neutral-600")
-                      }
-                    >
-                      {t.source}
-                    </span>
+                    {t.source === "researched" && (
+                      <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-emerald-700">
+                        researched
+                      </span>
+                    )}
                     {t.has_native_ai && (
                       <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-sky-700">
                         native AI

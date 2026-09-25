@@ -163,10 +163,11 @@ export default function CredentialsManager() {
       {needed.length > 0 && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm">
           <h3 className="font-semibold text-amber-950">
-            Keys for the plan you were building
+            Keys still listed from an earlier plan
           </h3>
           <p className="mt-2 text-amber-950">
-            Add each key below, then return to the workflow and confirm.
+            Grok Bot uses its own accounts for these tools. You do not need to
+            add them here for the handoff.
           </p>
           <ul className="mt-3 space-y-2">
             {needed.map((row) => {
@@ -195,7 +196,7 @@ export default function CredentialsManager() {
             })}
           </ul>
           <a href="/" className="mt-3 inline-block font-medium text-amber-950 underline">
-            Back to the workflow
+            Back to Enable AI
           </a>
         </div>
       )}

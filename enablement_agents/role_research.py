@@ -73,6 +73,7 @@ async def research_role(
     user: UserContext,
     *,
     cache: bool = True,
+    role_id: str | None = None,
 ) -> Role:
     """Research a job role with Claude, validate, and cache the card.
 
@@ -99,7 +100,8 @@ async def research_role(
             "Add it via the Settings page in the UI."
         )
 
-    role_id = normalize_role_id(name)
+    derived = normalize_role_id(name)
+    role_id = normalize_role_id(role_id) if role_id else derived
     schema = _schema_for_submit()
 
     user_message = (

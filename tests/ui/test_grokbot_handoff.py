@@ -26,6 +26,7 @@ _BODY = {
 def _isolate(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr("core.grokbot._file_env", lambda: {})
     monkeypatch.delenv("JEV_API_KEY", raising=False)
+    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
     monkeypatch.delenv("GROKBOT_GATEWAY_URL", raising=False)
     monkeypatch.delenv("SAND_GATEWAY_TOKEN", raising=False)
 
@@ -62,7 +63,7 @@ def test_handoff_endpoint_missing_jev_key_still_returns_copy_text(
     assert response.status_code == 200, response.text
     handoff = GrokbotHandoff.model_validate(response.json())
     assert handoff.action == "create_fallback"
-    assert "JEV_API_KEY" in handoff.placement
+    assert "TYPESAFE_API_KEY" in handoff.placement
     assert "Jev recommends:" not in handoff.description
     assert "Create a new bot named R-003 Developer Relations." in handoff.description
     assert _assignment() in handoff.description
@@ -70,7 +71,7 @@ def test_handoff_endpoint_missing_jev_key_still_returns_copy_text(
     assert "SAND_GATEWAY_TOKEN" not in response.text
 
 
-def test_handoff_endpoint_reads_jev_key_from_settings(
+def test_handoff_endpoint_ignores_jev_key_in_settings(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -81,21 +82,18 @@ def test_handoff_endpoint_reads_jev_key_from_settings(
     def _decide(state: object, questions: object, creds: object) -> dict[str, object]:
         seen["key"] = creds.get("JEV_API_KEY")  # type: ignore[attr-defined]
         return {
-            "mode": "real",
-            "reason": None,
-            "answers": {"placement": {"choice": "new_bot", "confidence": 0.9}},
+            "mode": "stub",
+            "reason": "missing credential: JEV_API_KEY",
+            "answers": None,
         }
 
     monkeypatch.setattr("core.grokbot.decide", _decide)
     response = TestClient(app).post("/api/grokbot/handoff", json=_BODY)
     assert response.status_code == 200, response.text
     handoff = GrokbotHandoff.model_validate(response.json())
-    assert seen["key"] == "from-settings"
-    assert handoff.placement == (
-        "Jev recommends: create a new bot named R-003 Developer Relations."
-    )
-    assert handoff.action == "create"
-    assert _assignment() in handoff.description
+    assert seen["key"] is None
+    assert "add it to .env" in handoff.placement
+    assert handoff.action == "create_fallback"
 
 
 def test_handoff_endpoint_reads_jev_key_from_env(
