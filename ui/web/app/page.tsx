@@ -274,7 +274,6 @@ export default function Home() {
 
   const pickedRecommendation =
     result?.plan.recommendations.find((rec) => rec.id === selectedRecommendationId) ??
-    result?.plan.recommendations[0] ??
     null;
   const roleName =
     roles.find((role) => role.id === selectedRole)?.display_name ??
@@ -418,7 +417,7 @@ export default function Home() {
             plan={result.plan}
             roleId={selectedRole}
             selectedTools={Array.from(selected)}
-            selectedRecommendationId={pickedRecommendation?.id ?? null}
+            selectedRecommendationId={selectedRecommendationId}
             onSelectRecommendation={setSelectedRecommendationId}
             onSaved={refreshSaved}
             onBuilt={handleBuilt}

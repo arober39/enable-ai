@@ -71,9 +71,12 @@ export default function BuildOrchestrator({
   onSelectRecommendation,
 }: Props) {
   const recs = plan.recommendations;
-  const selectedRecId = recs.some((rec) => rec.id === selectedRecommendationId)
-    ? selectedRecommendationId
-    : (recs[0]?.id ?? null);
+  const [draftId, setDraftId] = useState<string | null>(
+    recs.some((rec) => rec.id === selectedRecommendationId)
+      ? selectedRecommendationId
+      : null,
+  );
+  const selectedRecId = recs.some((rec) => rec.id === draftId) ? draftId : null;
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<BuildResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +87,10 @@ export default function BuildOrchestrator({
     ? BUILD_BUTTON_LABEL[selectedRec.kind]
     : "Build";
   const kindSubhead = selectedRec ? KIND_SUBHEAD[selectedRec.kind] : null;
+  const submitted =
+    selectedRecommendationId !== null &&
+    recs.some((rec) => rec.id === selectedRecommendationId) &&
+    selectedRecId === selectedRecommendationId;
 
   const onBuild = async () => {
     if (!selectedRecId) return;
@@ -183,7 +190,7 @@ export default function BuildOrchestrator({
                   name="rec-pick"
                   className="mt-1 h-4 w-4 accent-current text-accent"
                   checked={isSelected}
-                  onChange={() => onSelectRecommendation(r.id)}
+                  onChange={() => setDraftId(r.id)}
                   disabled={building}
                 />
                 <div className="flex-1">
@@ -238,7 +245,25 @@ export default function BuildOrchestrator({
         {kindSubhead && (
           <p className="text-xs text-neutral-500">{kindSubhead}</p>
         )}
+        <p className="text-xs text-neutral-500">
+          Submit to use this recommendation in the handoff.
+        </p>
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              if (selectedRecId) onSelectRecommendation(selectedRecId);
+            }}
+            disabled={!selectedRecId || submitted || building}
+            className={
+              "inline-flex items-center gap-2 rounded-md px-4 py-2 font-semibold text-white transition " +
+              (!selectedRecId || submitted || building
+                ? "bg-neutral-400 cursor-not-allowed"
+                : "bg-accent hover:bg-accent/90")
+            }
+          >
+            {submitted ? "Submitted" : "Submit"}
+          </button>
           <button
             type="button"
             onClick={onBuild}
