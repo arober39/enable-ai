@@ -31,6 +31,17 @@ def test_unknown_role_raises() -> None:
         declared_tool_names("not_a_role")
 
 
+def test_devrel_stack_is_docs_and_community() -> None:
+    names = declared_tool_names("devrel")
+    assert "discord" in names
+    assert "google_docs" in names
+    assert "discourse" not in names
+    assert "docs" not in names
+    user = local_user()
+    for name in names:
+        assert load_tool(user, name) is not None
+
+
 def test_customer_success_stack_is_not_the_support_stack() -> None:
     support = set(declared_tool_names("support"))
     success = set(declared_tool_names("customer_success"))

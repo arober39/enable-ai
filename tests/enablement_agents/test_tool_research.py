@@ -10,7 +10,7 @@ import pytest
 from anthropic.types import ToolUseBlock
 
 from core.identity import UserContext
-from core.tool_catalog import load_tool
+from core.tool_catalog import ToolCapability, cache_tool, list_researched_tools, load_tool
 from enablement_agents.tool_research import research_tool
 
 _FEATURES = [
@@ -148,3 +148,161 @@ async def test_research_error_omits_raw_pydantic_dump(
     assert "list_type" not in message
     assert "native_ai_features" not in message
     assert "vendor" in message
+
+
+def _capability(**overrides: object) -> ToolCapability:
+    payload: dict[str, object] = {
+        "canonical_name": "google_docs",
+        "vendor": "Google Docs",
+        "categories": ["documents"],
+        "native_ai_features": [],
+        "api_surface": {
+            "has_rest_api": True,
+            "has_webhooks": False,
+            "rate_limits": "standard",
+        },
+        "integration_patterns": ["use_native_ai"],
+        "notes": "Collaborative documents.",
+        "mcp_server": {"available": False, "tools_exposed": []},
+        "fallback_if_unavailable": "direct_api",
+        "source": "researched",
+    }
+    payload.update(overrides)
+    return ToolCapability.model_validate(payload)
+
+
+def _forbid_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _boom(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("Anthropic client was constructed")
+
+    monkeypatch.setattr("enablement_agents.tool_research.AsyncAnthropic", _boom)
+
+
+async def test_docs_reuses_existing_google_docs(
+    isolated_state: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = _user()
+    cache_tool(user, _capability())
+    cache_path = isolated_state / "alice" / "tool_cache" / "google_docs.json"
+    before = cache_path.read_text(encoding="utf-8")
+    _forbid_client(monkeypatch)
+
+    capability = await research_tool("docs", user)
+
+    assert capability.canonical_name == "google_docs"
+    assert capability.vendor == "Google Docs"
+    assert "docs" in (capability.notes or "")
+    assert "duplicate" in (capability.notes or "")
+    assert cache_path.read_text(encoding="utf-8") == before
+    assert not (isolated_state / "alice" / "tool_cache" / "docs.json").exists()
+
+
+async def test_gdocs_prefers_seeded_google_docs(
+    isolated_state: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = _user()
+    cache_tool(
+        user,
+        _capability(canonical_name="drive_docs", vendor="Google Docs", notes="Drive"),
+    )
+    _forbid_client(monkeypatch)
+
+    capability = await research_tool("gdocs", user)
+
+    assert capability.canonical_name == "google_docs"
+    cache_dir = isolated_state / "alice" / "tool_cache"
+    assert not (cache_dir / "gdocs.json").exists()
+    assert not (cache_dir / "docs.json").exists()
+    assert (cache_dir / "google_docs.json").is_file()
+    assert (cache_dir / "drive_docs.json").is_file()
+
+
+async def test_docs_prefers_canonical_google_docs_over_another_vendor_match(
+    isolated_state: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = _user()
+    cache_tool(user, _capability(canonical_name="drive_docs", notes="other"))
+    cache_tool(user, _capability())
+    _forbid_client(monkeypatch)
+
+    capability = await research_tool("docs", user)
+
+    assert capability.canonical_name == "google_docs"
+    assert not (isolated_state / "alice" / "tool_cache" / "docs.json").exists()
+
+
+async def test_docs_materializes_google_docs_seed_without_a_second_file(
+    isolated_state: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _forbid_client(monkeypatch)
+
+    capability = await research_tool("docs", _user())
+
+    assert capability.canonical_name == "google_docs"
+    assert capability.vendor == "Google Docs"
+    cache_dir = isolated_state / "alice" / "tool_cache"
+    assert not (cache_dir / "docs.json").exists()
+    assert (cache_dir / "google_docs.json").is_file()
+
+
+async def test_existing_docs_cache_collapses_into_google_docs(
+    isolated_state: Path,
+) -> None:
+    user = _user()
+    cache_tool(user, _capability(notes="kept"))
+    cache_tool(
+        user,
+        _capability(canonical_name="docs", vendor="Google Docs", notes="duplicate"),
+    )
+    cache_dir = isolated_state / "alice" / "tool_cache"
+
+    listed = list_researched_tools(user)
+
+    assert [item.canonical_name for item in listed] == ["google_docs"]
+    assert not (cache_dir / "docs.json").exists()
+    stored = json.loads((cache_dir / "google_docs.json").read_text(encoding="utf-8"))
+    assert stored["notes"] == "kept"
+
+
+async def test_docs_cache_migrates_when_google_docs_cache_is_missing(
+    isolated_state: Path,
+) -> None:
+    user = _user()
+    cache_tool(
+        user,
+        _capability(canonical_name="docs", vendor="Google Docs", notes="only copy"),
+    )
+
+    listed = list_researched_tools(user)
+
+    assert [item.canonical_name for item in listed] == ["google_docs"]
+    cache_dir = isolated_state / "alice" / "tool_cache"
+    assert not (cache_dir / "docs.json").exists()
+    stored = json.loads((cache_dir / "google_docs.json").read_text(encoding="utf-8"))
+    assert stored["canonical_name"] == "google_docs"
+    assert stored["notes"] == "only copy"
+
+
+async def test_docs_cache_for_a_documentation_site_is_left_alone(
+    isolated_state: Path,
+) -> None:
+    user = _user()
+    cache_tool(
+        user,
+        _capability(
+            canonical_name="docs",
+            vendor="Product documentation",
+            notes="site",
+        ),
+    )
+
+    listed = list_researched_tools(user)
+
+    assert [item.canonical_name for item in listed] == ["docs"]
+    cache_dir = isolated_state / "alice" / "tool_cache"
+    assert (cache_dir / "docs.json").is_file()
+    assert not (cache_dir / "google_docs.json").exists()

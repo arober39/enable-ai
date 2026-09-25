@@ -1,0 +1,21 @@
+canonical_name: google_docs
+vendor: Google Docs
+categories: [documents, knowledge_base, collaboration]
+native_ai_features:
+  - name: Help me write
+    description: In-document drafting and rewriting. Stays inside the open document and does not read Discord or GitHub.
+    maturity: ga
+    coverage: medium
+  - name: Help me organize
+    description: Summary and outline suggestions for the current document.
+    maturity: ga
+    coverage: low
+api_surface:
+  has_rest_api: true
+  has_webhooks: false
+  rate_limits: standard
+integration_patterns:
+  - use_native_ai
+  - augment_with_custom_ai
+  - orchestrate_into_unified_surface
+notes: "Google Docs is the document surface for DevRel tutorials and release notes. Native writing help does not ground claims in the product repo or community threads. Custom AI should read the document through the Docs API and keep a human review before publishing."

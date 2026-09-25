@@ -8,22 +8,27 @@ runner, synthetic planner, and UI role picker. Two backends:
 - Researched cache — `agent-state/<user_id>/role_cache/<id>.json`,
   written by `enablement_agents.role_research.research_role`.
 
-Seeded roles win when an id exists in both. A researched card never
-hides or rewrites a role that ships on disk.
+A researched card wins when an id exists in both. It also wins when its
+display name matches a seed. The seed file stays on disk. Deleting the
+researched card brings the seed back.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import re
 from pathlib import Path
-from typing import Literal, Self
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from core.identity import UserContext
+from core.llm_payload import coerce_string_list
 from core.roles import Role, list_roles, load_role
 from core.state import state_path
+
+logger = logging.getLogger(__name__)
 
 _CACHE_SUBDIR = "role_cache"
 
@@ -52,6 +57,31 @@ class RoleCard(BaseModel):
         ),
     )
     source: Literal["seed", "researched"] = "researched"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_stringified_fields(cls, data: Any) -> Any:
+        """Parse capabilities when a model returns them as a string.
+
+        The JSON schema still requires a real array. This only runs at parse
+        time: a JSON string, a fenced list, or a list wrapped in XML/parameter
+        tags becomes `list[str]` before field validation. The same parser
+        `ToolCapability` uses for stringified lists lives in `core.llm_payload`.
+        """
+        if not isinstance(data, dict) or "capabilities" not in data:
+            return data
+        original = data["capabilities"]
+        coerced = coerce_string_list(original)
+        if coerced is original:
+            return data
+        if original is None:
+            logger.debug("role card: coerced null capabilities to an empty list")
+        else:
+            logger.warning(
+                "role card: normalized capabilities from %s",
+                type(original).__name__,
+            )
+        return {**data, "capabilities": coerced}
 
     @field_validator("capabilities")
     @classmethod
