@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import threading
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 
+import core.grokbot_roster as roster
 from core.grokbot import (
     GrokbotHandoff,
     HandoffCredentials,
@@ -436,7 +438,7 @@ def test_repeat_handoff_updates_the_remembered_bot(
     assert stored[0].remembered_at >= first.remembered_at
 
 
-def test_renamed_new_bot_for_the_same_recommendation_updates_in_place(
+def test_same_role_updates_one_bot_across_recommendations(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def _boom(*_args: object, **_kwargs: object) -> None:
@@ -444,12 +446,82 @@ def test_renamed_new_bot_for_the_same_recommendation_updates_in_place(
 
     monkeypatch.setattr("core.grokbot._client", _boom)
     _sample_handoff(creds=_Creds({}))
-    _sample_handoff(creds=_Creds({}), role_name="Community")
+    _sample_handoff(
+        creds=_Creds({}),
+        recommendation_id="R-006",
+        description="Recommend talks from Discord trends.",
+    )
+    _sample_handoff(creds=_Creds({}), role_name="Community", recommendation_id="R-003")
+    stored = load_remembered_bots(local_user())
+    by_name = {bot.name: bot for bot in stored}
+    assert set(by_name) == {"Developer Relations", "Community"}
+    role_bot = by_name["Developer Relations"]
+    assert role_bot.id == "local:developer-relations"
+    assert role_bot.recommendation_id == "R-006"
+    assert "Recommend talks from Discord trends." in role_bot.description
+    assert "R-003" not in role_bot.name
+    assert "R-006" not in role_bot.name
+
+
+def test_legacy_recommendation_names_collapse_to_one_role_bot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = roster.state_path(local_user(), "grokbot_roster.json")
+    path.parent.mkdir(parents=True)
+    rows = []
+    for index, rec in enumerate(("R-003", "R-005", "R-006"), start=1):
+        rows.append(
+            {
+                "id": f"local:{rec.lower()}-developer-relations",
+                "name": f"{rec} Developer Relations",
+                "title": "Developer Relations",
+                "description": f"work {rec}",
+                "role_name": "Developer Relations",
+                "role_id": "devrel",
+                "recommendation_id": rec,
+                "action": "create_fallback" if index < 3 else "update",
+                "remembered_at": f"2026-09-25T00:00:0{index}+00:00",
+            }
+        )
+    path.write_text(json.dumps(rows), encoding="utf-8")
+
     stored = load_remembered_bots(local_user())
     assert len(stored) == 1
-    assert stored[0].name == "Community"
-    assert stored[0].recommendation_id == "R-003"
-    assert stored[0].role_id == "community"
+    assert stored[0].name == "Developer Relations"
+    assert stored[0].id == "local:developer-relations"
+    assert stored[0].recommendation_id == "R-006"
+    assert stored[0].description == "work R-006"
+
+    seen: dict[str, object] = {}
+
+    def _decide(state: dict, questions: dict, creds: object) -> dict:
+        seen["bots"] = state["existing_bots"]
+        return {
+            "mode": "stub",
+            "reason": "missing credential: TYPESAFE_API_KEY",
+            "answers": None,
+        }
+
+    monkeypatch.setattr("core.grokbot.decide", _decide)
+    handoff = build_handoff(
+        recommendation_id="R-010",
+        kind="orchestrate",
+        description="Weekly content recommendations.",
+        notes=None,
+        role_name="Developer Relations",
+        tools=["discord"],
+        creds=_Creds({}),
+    )
+    bots = seen["bots"]
+    assert isinstance(bots, list)
+    assert [bot["name"] for bot in bots] == ["Developer Relations"]
+    assert handoff.name == "Developer Relations"
+    assert "R-006" not in handoff.name
+    assert "add this to existing bot R-" not in handoff.placement
+    written = json.loads(path.read_text(encoding="utf-8"))
+    assert len(written) == 1
+    assert written[0]["name"] == "Developer Relations"
+    assert written[0]["recommendation_id"] == "R-010"
 
 
 def test_missing_jev_key_fallback_stays_a_new_bot_after_memory(

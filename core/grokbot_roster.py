@@ -5,8 +5,11 @@ handoff named, so a later handoff in the same process can ask Jev to add
 work to that bot when the Grok Bot gateway is unset.
 
 File: `agent-state/<user_id>/grokbot_roster.json`. Same per-user layout
-as workflows and credentials. One row per bot name. Repeating a
-recommendation that was handed off as a new bot updates that row.
+as workflows and credentials. One row per Grok Bot. The role's bot is that
+role's title (for example "Developer Relations"). A later handoff for the
+same role updates that row. A recommendation id is recorded on the row and
+is not a separate bot. Names shaped like "R-006 Developer Relations" are
+the same role bot.
 
 The API server deletes every user's roster file on startup. A fresh
 process starts with an empty remembered list.
@@ -38,7 +41,7 @@ _ROSTER_FILE = "grokbot_roster.json"
 _ROSTER_LIMIT = 40
 
 RosterAction = Literal["create", "update", "create_fallback"]
-_NEW_BOT_ACTIONS = frozenset({"create", "create_fallback"})
+_REC_PREFIX = re.compile(r"r-\d+")
 
 
 class RememberedBot(BaseModel):
@@ -67,6 +70,84 @@ def local_bot_id(name: str) -> str:
 def normalized_bot_name(name: str) -> str:
     """Compare bot names without case or extra whitespace."""
     return " ".join(name.strip().lower().split())
+
+
+def _display_name(name: str) -> str:
+    return " ".join(name.split())
+
+
+def _is_legacy_rec_name(name: str, role: str, recommendation_id: str = "") -> bool:
+    """True when `name` is the role title with a recommendation id in front."""
+    role_norm = normalized_bot_name(role)
+    name_norm = normalized_bot_name(name)
+    if not role_norm or not name_norm.endswith(role_norm):
+        return False
+    prefix = name_norm[: -len(role_norm)].strip()
+    if not prefix:
+        return False
+    if _REC_PREFIX.fullmatch(prefix):
+        return True
+    rec = normalized_bot_name(recommendation_id)
+    return bool(rec) and prefix == rec
+
+
+def _role_label(bot: RememberedBot) -> str:
+    return _display_name(bot.role_name) or _display_name(bot.title)
+
+
+def _is_role_bot(bot: RememberedBot) -> bool:
+    """True when this row is the role's Grok Bot, including a legacy R-00N name."""
+    role = _role_label(bot)
+    if not role:
+        return False
+    if normalized_bot_name(bot.name) == normalized_bot_name(role):
+        return True
+    return _is_legacy_rec_name(bot.name, role, bot.recommendation_id)
+
+
+def _same_role(left: RememberedBot, right: RememberedBot) -> bool:
+    left_id = (left.role_id or "").strip().lower()
+    right_id = (right.role_id or "").strip().lower()
+    if left_id and right_id:
+        return left_id == right_id
+    left_name = normalized_bot_name(left.role_name)
+    right_name = normalized_bot_name(right.role_name)
+    return bool(left_name) and left_name == right_name
+
+
+def _same_bot(left: RememberedBot, right: RememberedBot) -> bool:
+    """One Grok Bot. Recommendation ids do not make another bot."""
+    if normalized_bot_name(left.name) == normalized_bot_name(right.name):
+        return True
+    return _is_role_bot(left) and _is_role_bot(right) and _same_role(left, right)
+
+
+def _canonicalize(bot: RememberedBot) -> RememberedBot:
+    """Store the role title when the row is that role's bot."""
+    role = _role_label(bot)
+    name = _display_name(bot.name)
+    if role and (
+        normalized_bot_name(name) == normalized_bot_name(role)
+        or _is_legacy_rec_name(name, role, bot.recommendation_id)
+    ):
+        name = role
+    title = bot.title.strip() or name
+    return bot.model_copy(update={"name": name, "id": local_bot_id(name), "title": title})
+
+
+def _collapse(bots: list[RememberedBot]) -> list[RememberedBot]:
+    """One row per Grok Bot. The newest handoff for a role's bot wins."""
+    kept: list[RememberedBot] = []
+    ordered = sorted(enumerate(bots), key=lambda pair: (pair[1].remembered_at, pair[0]))
+    for _index, bot in ordered:
+        current = _canonicalize(bot)
+        slot = next((i for i, item in enumerate(kept) if _same_bot(item, current)), None)
+        if slot is None:
+            kept.append(current)
+            continue
+        if current.remembered_at >= kept[slot].remembered_at:
+            kept[slot] = current
+    return kept
 
 
 def _path_for(user: UserContext) -> Path:
@@ -145,22 +226,12 @@ def clear_remembered_rosters(root: Path | None = None) -> int:
 
 
 def load_remembered_bots(user: UserContext) -> list[RememberedBot]:
-    """Remembered bots, newest handoff first."""
-    return sorted(_read(user), key=lambda bot: bot.remembered_at, reverse=True)
+    """Remembered bots, newest handoff first.
 
-
-def _dedupe_names(bots: list[RememberedBot]) -> list[RememberedBot]:
-    best: dict[str, RememberedBot] = {}
-    order: list[str] = []
-    for bot in bots:
-        key = normalized_bot_name(bot.name)
-        if key not in best:
-            order.append(key)
-            best[key] = bot
-            continue
-        if bot.remembered_at >= best[key].remembered_at:
-            best[key] = bot
-    return [best[key] for key in order]
+    Rows that name the same Grok Bot, including legacy "R-006 {role}"
+    names for one role, come back as that one bot.
+    """
+    return sorted(_collapse(_read(user)), key=lambda bot: bot.remembered_at, reverse=True)
 
 
 def _cap(bots: list[RememberedBot]) -> list[RememberedBot]:
@@ -177,36 +248,17 @@ def _cap(bots: list[RememberedBot]) -> list[RememberedBot]:
 
 
 def remember_bot(user: UserContext, bot: RememberedBot) -> list[RememberedBot]:
-    """Insert or update one remembered bot. Returns the stored roster, newest first."""
-    display = bot.name.strip()
-    stored = bot.model_copy(update={"id": local_bot_id(display), "name": display})
+    """Insert or update one remembered bot. Returns the stored roster, newest first.
+
+    The role's bot is updated in place. A different recommendation for that
+    role does not append another row, and a legacy "R-00N {role}" name is
+    stored as the role title.
+    """
+    stored = _canonicalize(bot.model_copy(update={"name": _display_name(bot.name)}))
     with _exclusive(user):
         items = _read(user)
-        name_key = normalized_bot_name(display)
-        name_idx = next(
-            (i for i, item in enumerate(items) if normalized_bot_name(item.name) == name_key),
-            None,
-        )
-        rec_idx = next(
-            (
-                i
-                for i, item in enumerate(items)
-                if item.recommendation_id == stored.recommendation_id
-            ),
-            None,
-        )
-        if name_idx is not None:
-            items[name_idx] = stored
-        elif (
-            rec_idx is not None
-            and items[rec_idx].action in _NEW_BOT_ACTIONS
-            and stored.action in _NEW_BOT_ACTIONS
-        ):
-            # Same recommendation handed off again as a new bot (role rename included).
-            items[rec_idx] = stored
-        else:
-            items.append(stored)
-        _write(user, _cap(_dedupe_names(items)))
+        items.append(stored)
+        _write(user, _cap(_collapse(items)))
     logger.info(
         "remembered grokbot handoff bot=%s recommendation=%s action=%s",
         stored.name,
