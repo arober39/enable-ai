@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { saveRecommendation } from "../lib/api";
 import type { EnablementPlan, Recommendation } from "../lib/types";
 
@@ -37,13 +37,7 @@ export default function BuildOrchestrator({
   const recs = plan.recommendations;
   const selectedRecId = recs.some((rec) => rec.id === selectedRecommendationId)
     ? selectedRecommendationId
-    : (recs[0]?.id ?? null);
-
-  useEffect(() => {
-    if (selectedRecId && selectedRecId !== selectedRecommendationId) {
-      onSelectRecommendation(selectedRecId);
-    }
-  }, [selectedRecId, selectedRecommendationId, onSelectRecommendation]);
+    : null;
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 

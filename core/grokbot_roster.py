@@ -1,12 +1,15 @@
 """Bots remembered from copy-paste Grok Bot handoffs.
 
-Step 7 does not create bots. It does remember the bot each successful
-handoff named, so a later handoff can ask Jev to add work to that bot
-when the Grok Bot gateway is unset.
+The handoff does not create bots. It does remember the bot each successful
+handoff named, so a later handoff in the same process can ask Jev to add
+work to that bot when the Grok Bot gateway is unset.
 
 File: `agent-state/<user_id>/grokbot_roster.json`. Same per-user layout
 as workflows and credentials. One row per bot name. Repeating a
 recommendation that was handed off as a new bot updates that row.
+
+The API server deletes every user's roster file on startup. A fresh
+process starts with an empty remembered list.
 """
 
 from __future__ import annotations
@@ -26,7 +29,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from core.identity import UserContext
-from core.state import state_path
+from core.state import repo_root, state_path
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +121,27 @@ def _write(user: UserContext, bots: list[RememberedBot]) -> None:
         tmp.replace(path)
     finally:
         tmp.unlink(missing_ok=True)
+
+
+def clear_remembered_rosters(root: Path | None = None) -> int:
+    """Delete remembered Grok Bot rosters so a new process starts empty.
+
+    `root` is the agent-state directory (default: `<repo>/agent-state`).
+    Every `*/grokbot_roster.json` under it is removed, including the local
+    single-user file and any other user directory. Other files in those
+    directories are left in place. Returns how many roster files were deleted.
+    """
+    base = repo_root() / "agent-state" if root is None else root
+    if not base.is_dir():
+        return 0
+    removed = 0
+    for path in base.glob(f"*/{_ROSTER_FILE}"):
+        if not path.is_file():
+            continue
+        path.unlink()
+        removed += 1
+        logger.info("cleared grokbot roster at %s", path)
+    return removed
 
 
 def load_remembered_bots(user: UserContext) -> list[RememberedBot]:

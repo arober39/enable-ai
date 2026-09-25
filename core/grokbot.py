@@ -3,10 +3,11 @@
 Step 7 asks Jev whether the recommendation is a new bot or belongs on an
 existing one, then shows text the user pastes into Grok Bot. It never calls
 createAgent or updateAgent. listAgents runs only when gateway credentials
-are present. Bots named by earlier handoffs are remembered under
-`agent-state/<user_id>/grokbot_roster.json` and sent to Jev even when the
-gateway is unset. `apply_recommendation` remains for a later path that
-would write the bot itself.
+are present. Bots named by earlier handoffs in this process are remembered
+under `agent-state/<user_id>/grokbot_roster.json` and sent to Jev even when
+the gateway is unset. The API deletes those files on startup. A remembered
+row uses the role title the handoff tells the user to paste.
+`apply_recommendation` remains for a later path that would write the bot itself.
 """
 
 from __future__ import annotations
@@ -140,9 +141,13 @@ def assignment_text(
     return "\n\n".join(part for part in parts if part)
 
 
-def _bot_name(recommendation_id: str, role_name: str) -> str:
-    rec_id = recommendation_id or "recommendation"
-    return f"{rec_id} {role_name}".strip()[:_NAME_LIMIT] or rec_id
+def _bot_name(role_name: str) -> str:
+    """Role title the user pastes as the Grok Bot name.
+
+    The recommendation id stays in the assignment body. Remembered roster
+    rows use this same role title.
+    """
+    return role_name.strip()[:_NAME_LIMIT] or "Enable AI"
 
 
 def _bot_title(role_name: str) -> str:
@@ -212,7 +217,7 @@ def build_handoff(
     remembered roster.
     """
     owner = user if user is not None else local_user()
-    suggested = _bot_name(recommendation_id, role_name)
+    suggested = _bot_name(role_name)
     title = _bot_title(role_name)
     body = assignment_text(
         recommendation_id=recommendation_id,
@@ -599,7 +604,7 @@ def apply_recommendation(
     rec_id = str(recommendation.get("id") or "recommendation")
     try:
         if decision["choice"] == _NEW:
-            name = _bot_name(rec_id, role_name)
+            name = _bot_name(role_name)
             created = _command(
                 base,
                 token,

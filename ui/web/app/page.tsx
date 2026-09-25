@@ -49,6 +49,12 @@ export default function Home() {
   const [selectedRecommendationId, setSelectedRecommendationId] = useState<
     string | null
   >(null);
+  // Step 6 follows the last submitted recommendation. The radio above it
+  // can move without replacing the handoff.
+  const [submittedRecommendationId, setSubmittedRecommendationId] = useState<
+    string | null
+  >(null);
+  const [handoffSubmitVersion, setHandoffSubmitVersion] = useState(0);
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -75,6 +81,7 @@ export default function Home() {
           setSelectedRoleState(saved.selectedRole);
           setResult(saved.result);
           setSelectedRecommendationId(saved.selectedRecommendationId ?? null);
+          setSubmittedRecommendationId(saved.submittedRecommendationId ?? null);
           setEnablementJobId(saved.enablementJobId ?? null);
           setEnablementStartedAt(saved.enablementStartedAt ?? null);
           setBuildJobId(saved.buildJobId ?? null);
@@ -85,6 +92,7 @@ export default function Home() {
         setSelectedRoleState(null);
         setResult(null);
         setSelectedRecommendationId(null);
+        setSubmittedRecommendationId(null);
         setEnablementJobId(null);
         setEnablementStartedAt(null);
         setBuildJobId(null);
@@ -115,6 +123,7 @@ export default function Home() {
       selectedRole,
       result,
       selectedRecommendationId,
+      submittedRecommendationId,
       enablementJobId,
       enablementStartedAt,
       buildJobId,
@@ -128,6 +137,7 @@ export default function Home() {
     selectedRole,
     result,
     selectedRecommendationId,
+    submittedRecommendationId,
     enablementJobId,
     enablementStartedAt,
     buildJobId,
@@ -198,6 +208,7 @@ export default function Home() {
     setError(null);
     setResult(null);
     setSelectedRecommendationId(null);
+    setSubmittedRecommendationId(null);
     setBuildJobId(null);
     try {
       const job = await startEnablementJob(
@@ -231,11 +242,10 @@ export default function Home() {
         if (job.status === "done" && job.result) {
           const plan = job.result;
           setResult(plan);
+          setSubmittedRecommendationId(null);
           const ids = new Set(plan.plan.recommendations.map((rec) => rec.id));
           setSelectedRecommendationId((current) =>
-            current && ids.has(current)
-              ? current
-              : (plan.plan.recommendations[0]?.id ?? null),
+            current && ids.has(current) ? current : null,
           );
         } else setError(job.error ?? "Enablement run failed.");
       } catch (e) {
@@ -274,10 +284,25 @@ export default function Home() {
     }
   };
 
-  const pickedRecommendation =
+  const draftRecommendation =
     result?.plan.recommendations.find((rec) => rec.id === selectedRecommendationId) ??
-    result?.plan.recommendations[0] ??
     null;
+  const submittedRecommendation =
+    result?.plan.recommendations.find((rec) => rec.id === submittedRecommendationId) ??
+    null;
+  const handoffHint =
+    submittedRecommendation &&
+    draftRecommendation &&
+    draftRecommendation.id !== submittedRecommendation.id
+      ? `The Grokbot handoff stays on ${submittedRecommendation.id} until you submit again.`
+      : !submittedRecommendation
+        ? "Select a recommendation and press Submit to hand it to Grokbot."
+        : null;
+  const submitRecommendation = () => {
+    if (!draftRecommendation) return;
+    setSubmittedRecommendationId(draftRecommendation.id);
+    setHandoffSubmitVersion((version) => version + 1);
+  };
   const roleName =
     roles.find((role) => role.id === selectedRole)?.display_name ??
     selectedRole ??
@@ -411,22 +436,38 @@ export default function Home() {
             onSelectRecommendation={setSelectedRecommendationId}
             onSaved={refreshSaved}
           />
+          <button
+            type="button"
+            disabled={draftRecommendation == null}
+            onClick={submitRecommendation}
+            className={
+              "mt-4 inline-flex items-center gap-2 rounded-md px-4 py-2 font-semibold text-white transition " +
+              (draftRecommendation == null
+                ? "cursor-not-allowed bg-neutral-400"
+                : "bg-accent hover:bg-accent/90")
+            }
+          >
+            Submit
+          </button>
+          {handoffHint && (
+            <p className="mt-2 text-xs text-neutral-500">{handoffHint}</p>
+          )}
         </section>
       )}
 
-      {result && !loading && selectedRole && pickedRecommendation && (
+      {result && !loading && selectedRole && submittedRecommendation && (
         <section>
           <h2 className="mb-3 text-base font-semibold">
-            6. Hand {pickedRecommendation.id} to Grokbot
+            6. Hand {submittedRecommendation.id} to Grokbot
           </h2>
           <GrokbotHandoff
-            key={pickedRecommendation.id}
-            recommendation={pickedRecommendation}
+            key={`${submittedRecommendation.id}:${handoffSubmitVersion}`}
+            recommendation={submittedRecommendation}
             roleName={roleName}
             roleId={selectedRole}
             tools={
-              pickedRecommendation.tools_affected.length > 0
-                ? pickedRecommendation.tools_affected
+              submittedRecommendation.tools_affected.length > 0
+                ? submittedRecommendation.tools_affected
                 : Array.from(selected)
             }
           />

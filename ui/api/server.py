@@ -77,6 +77,7 @@ from core.credentials import (
     credentials_in_env,
 )
 from core.grokbot import GrokbotHandoff, HandoffCredentials, build_handoff
+from core.grokbot_roster import clear_remembered_rosters
 from core.identity import UserContext, local_user
 from core.jev import label_escalation
 from core.outcomes import (
@@ -162,10 +163,12 @@ REPO_ROOT: Path = Path(__file__).resolve().parents[2]
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
-    # Keys added in Settings belong to this process. A restart starts empty.
-    # Tests import this app; they must not wipe the developer's vault.
+    # Settings keys and copy-paste Grok Bot memory belong to this process.
+    # A restart starts with an empty vault and no remembered bots.
+    # Tests import this app; they must not wipe the developer's state.
     if not os.environ.get("PYTEST_CURRENT_TEST"):
         LocalFileCredentialStore(local_user()).clear()
+        clear_remembered_rosters()
     yield
 
 
@@ -955,7 +958,7 @@ def grokbot_handoff(req: GrokbotHandoffRequest) -> GrokbotHandoff:
 
     Does not call createAgent or updateAgent. listAgents runs only when
     gateway credentials are set. Bots remembered from earlier handoffs
-    are included either way.
+    in this process are included either way. A restart clears that roster.
     """
     user = _current_user()
     creds = HandoffCredentials(LocalFileCredentialStore(user))

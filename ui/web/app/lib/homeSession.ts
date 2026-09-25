@@ -10,6 +10,7 @@ export type HomeSession = {
   selectedRole: string | null;
   result: EnablementResponse | null;
   selectedRecommendationId?: string | null;
+  submittedRecommendationId?: string | null;
   enablementJobId?: string | null;
   enablementStartedAt?: number | null;
   buildJobId?: string | null;

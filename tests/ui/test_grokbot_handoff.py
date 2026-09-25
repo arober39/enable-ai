@@ -11,7 +11,7 @@ from core.credentials import LocalFileCredentialStore
 from core.grokbot import GrokbotHandoff, assignment_text
 from core.grokbot_roster import load_remembered_bots
 from core.identity import local_user
-from ui.api.server import app
+from ui.api.server import _lifespan, app
 
 _BODY = {
     "recommendation_id": "R-003",
@@ -65,7 +65,7 @@ def test_handoff_endpoint_missing_jev_key_still_returns_copy_text(
     assert handoff.action == "create_fallback"
     assert "TYPESAFE_API_KEY" in handoff.placement
     assert "Jev recommends:" not in handoff.description
-    assert "Create a new bot named R-003 Developer Relations." in handoff.description
+    assert "Create a new bot named Developer Relations." in handoff.description
     assert _assignment() in handoff.description
     assert "GROKBOT_GATEWAY_URL" not in response.text
     assert "SAND_GATEWAY_TOKEN" not in response.text
@@ -140,7 +140,7 @@ def test_handoff_endpoint_remembers_a_bot_and_offers_it_next_time(
     assert opened.action == "create_fallback"
     stored = load_remembered_bots(local_user())
     assert len(stored) == 1
-    assert stored[0].name == "R-003 Developer Relations"
+    assert stored[0].name == "Developer Relations"
     assert stored[0].role_id == "devrel"
     assert (tmp_path / "local" / "grokbot_roster.json").is_file()
 
@@ -166,10 +166,37 @@ def test_handoff_endpoint_remembers_a_bot_and_offers_it_next_time(
     handoff = GrokbotHandoff.model_validate(second.json())
     assert handoff.used_remembered_roster is True
     assert handoff.action == "update"
-    assert handoff.existing_bot_name == "R-003 Developer Relations"
+    assert handoff.existing_bot_name == "Developer Relations"
     bots = seen["bots"]
     assert isinstance(bots, list)
-    assert bots[0]["name"] == "R-003 Developer Relations"
+    assert bots[0]["name"] == "Developer Relations"
     assert "GROKBOT_GATEWAY_URL" not in second.text
     assert "SAND_GATEWAY_TOKEN" not in second.text
     assert [bot.recommendation_id for bot in load_remembered_bots(local_user())] == ["R-010"]
+
+
+async def test_server_startup_deletes_every_remembered_roster(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    agent_state = tmp_path / "agent-state"
+    for user_id in ("local", "ada"):
+        roster = agent_state / user_id / "grokbot_roster.json"
+        roster.parent.mkdir(parents=True)
+        roster.write_text('[{"name": "R-006 Developer Relations"}]', encoding="utf-8")
+    kept = agent_state / "local" / "credentials.json"
+    kept.write_text('{"ANTHROPIC_API_KEY": "from-last-process"}', encoding="utf-8")
+
+    monkeypatch.setattr("core.grokbot_roster.repo_root", lambda: tmp_path)
+
+    def _cred_path(user: object, *parts: str) -> Path:
+        user_id = getattr(user, "user_id", "local")
+        return tmp_path.joinpath("vault", str(user_id), *parts)
+
+    monkeypatch.setattr("core.credentials.state_path", _cred_path)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+
+    async with _lifespan(app):
+        assert not (agent_state / "local" / "grokbot_roster.json").exists()
+        assert not (agent_state / "ada" / "grokbot_roster.json").exists()
+        assert kept.read_text(encoding="utf-8") == '{"ANTHROPIC_API_KEY": "from-last-process"}'

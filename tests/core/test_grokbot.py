@@ -15,7 +15,12 @@ from core.grokbot import (
     assignment_text,
     build_handoff,
 )
-from core.grokbot_roster import RememberedBot, load_remembered_bots, remember_bot
+from core.grokbot_roster import (
+    RememberedBot,
+    clear_remembered_rosters,
+    load_remembered_bots,
+    remember_bot,
+)
 from core.identity import local_user
 
 
@@ -104,7 +109,7 @@ def test_handoff_text_assigns_the_work_and_lists_the_tools() -> None:
     assert "Enable AI does not call these tools" in parsed.description
     assert "discord, google_docs" in parsed.description
     assert "Use the community themes." in parsed.description
-    assert parsed.name == "R-003 Developer Relations"
+    assert parsed.name == "Developer Relations"
     assert parsed.title == "Developer Relations"
 
 
@@ -119,7 +124,7 @@ def test_missing_jev_key_says_so_and_defaults_to_a_new_bot(
     assert handoff.action == "create_fallback"
     assert handoff.placement.startswith("Jev did not choose a bot")
     assert "TYPESAFE_API_KEY" in handoff.placement
-    assert "Create a new bot named R-003 Developer Relations." in handoff.placement
+    assert "Create a new bot named Developer Relations." in handoff.placement
     assert "Jev recommends:" not in handoff.description
     assert handoff.description.startswith(handoff.placement)
     assert _body() in handoff.description
@@ -140,7 +145,7 @@ def test_low_confidence_is_not_labeled_as_a_jev_decision(
     assert handoff.action == "create_fallback"
     assert "low confidence" in handoff.placement
     assert "Jev recommends:" not in handoff.description
-    assert "Create a new bot named R-003 Developer Relations." in handoff.placement
+    assert "Create a new bot named Developer Relations." in handoff.placement
     assert _body() in handoff.description
 
 
@@ -163,7 +168,7 @@ def test_jev_recommendation_for_a_new_bot_is_in_the_assignment(
     assert handoff.action == "create"
     assert handoff.existing_bot_name is None
     assert handoff.placement == (
-        "Jev recommends: create a new bot named R-003 Developer Relations."
+        "Jev recommends: create a new bot named Developer Relations."
     )
     assert handoff.description.startswith(handoff.placement)
     assert _body() in handoff.description
@@ -302,7 +307,9 @@ def test_jev_key_comes_from_env_or_file_not_settings(
     )
     monkeypatch.delenv("JEV_API_KEY")
     monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
-    layered = HandoffCredentials(_Creds({"JEV_API_KEY": "from-settings", "TYPESAFE_API_KEY": "settings-typesafe"}))
+    layered = HandoffCredentials(
+        _Creds({"JEV_API_KEY": "from-settings", "TYPESAFE_API_KEY": "settings-typesafe"})
+    )
     assert layered.get("JEV_API_KEY") == "from-file"
     assert layered.get("TYPESAFE_API_KEY") is None
     assert layered.get("GROKBOT_GATEWAY_URL") == "http://gw"
@@ -323,7 +330,7 @@ def test_handoff_name_and_title_use_the_same_limits_as_the_gateway_writer() -> N
         role_name=role,
         tools=["slack"],
     )
-    assert handoff.name == f"R-003 {role}"[:80]
+    assert handoff.name == role[:80]
     assert handoff.title == role[:80]
     assert len(handoff.name) == 80
     assert len(handoff.title) == 80
@@ -342,13 +349,14 @@ def test_handoff_remembers_the_bot_without_gateway_credentials(
     stored = load_remembered_bots(local_user())
     assert len(stored) == 1
     bot = stored[0]
-    assert bot.name == "R-003 Developer Relations"
+    assert bot.name == "Developer Relations"
+    assert bot.recommendation_id not in bot.name
     assert bot.title == "Developer Relations"
     assert bot.role_name == "Developer Relations"
     assert bot.role_id == "devrel"
     assert bot.recommendation_id == "R-003"
     assert bot.action == "create_fallback"
-    assert bot.id == "local:r-003-developer-relations"
+    assert bot.id == "local:developer-relations"
     assert "Turn Discord messages into content ideas." in bot.description
     assert "Jev did not choose" not in bot.description
     assert bot.remembered_at.tzinfo is not None
@@ -386,20 +394,20 @@ def test_later_handoff_offers_the_remembered_bot_without_a_gateway(
     )
     assert handoff.used_remembered_roster is True
     assert handoff.action == "update"
-    assert handoff.existing_bot_name == "R-003 Developer Relations"
-    assert handoff.name == "R-003 Developer Relations"
+    assert handoff.existing_bot_name == "Developer Relations"
+    assert handoff.name == "Developer Relations"
     assert handoff.placement == (
-        "Jev recommends: add this to existing bot R-003 Developer Relations."
+        "Jev recommends: add this to existing bot Developer Relations."
     )
     bots = seen["bots"]
     assert isinstance(bots, list)
     assert bots[0]["id"] == remembered.id
-    assert bots[0]["name"] == "R-003 Developer Relations"
+    assert bots[0]["name"] == "Developer Relations"
     criteria = seen["criteria"]
     assert isinstance(criteria, dict)
     assert remembered.id in criteria
     assert "existing_bot" not in criteria
-    assert "R-003 Developer Relations" in criteria[remembered.id]
+    assert "Developer Relations" in criteria[remembered.id]
 
 
 def test_repeat_handoff_updates_the_remembered_bot(
@@ -439,7 +447,7 @@ def test_renamed_new_bot_for_the_same_recommendation_updates_in_place(
     _sample_handoff(creds=_Creds({}), role_name="Community")
     stored = load_remembered_bots(local_user())
     assert len(stored) == 1
-    assert stored[0].name == "R-003 Community"
+    assert stored[0].name == "Community"
     assert stored[0].recommendation_id == "R-003"
     assert stored[0].role_id == "community"
 
@@ -466,8 +474,8 @@ def test_missing_jev_key_fallback_stays_a_new_bot_after_memory(
     assert second.used_remembered_roster is True
     assert second.action == "create_fallback"
     assert second.placement.startswith("Jev did not choose a bot")
-    assert "JEV_API_KEY" in second.placement
-    assert "Create a new bot named R-003 Developer Relations." in second.placement
+    assert "TYPESAFE_API_KEY" in second.placement
+    assert "Create a new bot named Developer Relations." in second.placement
     assert "Jev recommends:" not in second.description
     assert _body() in second.description
 
@@ -541,7 +549,7 @@ def test_gateway_roster_keeps_local_only_bots(monkeypatch: pytest.MonkeyPatch) -
     bots = seen["bots"]
     assert isinstance(bots, list)
     names = [bot["name"] for bot in bots]
-    assert names == ["R-003 Developer Relations", "Ada"]
+    assert names == ["Developer Relations", "Ada"]
     assert [url.rsplit("/", 1)[-1] for url, _payload in client.calls] == ["listAgents"]
 
 
@@ -692,7 +700,7 @@ def test_corrupt_roster_file_does_not_block_a_handoff(
     handoff = _sample_handoff(creds=_Creds({"JEV_API_KEY": "jv_test"}))
     assert handoff.action == "create"
     assert handoff.used_remembered_roster is False
-    assert load_remembered_bots(local_user())[0].name == "R-003 Developer Relations"
+    assert load_remembered_bots(local_user())[0].name == "Developer Relations"
 
 
 def test_missing_gateway_does_not_write() -> None:
@@ -714,7 +722,7 @@ def test_jev_creates_a_bot_that_owns_the_tools(monkeypatch: pytest.MonkeyPatch) 
             "createAgent": {
                 "agent": {
                     "id": "bot-1",
-                    "name": "R-003 Developer Relations",
+                    "name": "Developer Relations",
                     "title": "Developer Relations",
                     "description": "assigned",
                 }
@@ -745,8 +753,10 @@ def test_jev_creates_a_bot_that_owns_the_tools(monkeypatch: pytest.MonkeyPatch) 
     )
     assert out["action"] == "created"
     assert out["source"] == "jev"
-    assert out["bot"]["name"] == "R-003 Developer Relations"
+    assert out["bot"]["name"] == "Developer Relations"
     create = next(body for url, body in client.calls if url.endswith("/createAgent"))
+    assert create["name"] == "Developer Relations"
+    assert create["title"] == "Developer Relations"
     assert create["description"] == assignment_text(
         recommendation_id="R-003",
         kind="orchestrate",
@@ -784,3 +794,88 @@ def test_uncertain_jev_does_not_edit_a_bot(monkeypatch: pytest.MonkeyPatch) -> N
     assert out["source"] == "heuristic"
     assert all(not url.endswith("/createAgent") for url, _body in client.calls)
     assert all(not url.endswith("/updateAgent") for url, _body in client.calls)
+
+
+def test_cleared_roster_is_invisible_until_this_process_writes_again(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    def _boom(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("remembered bots must not require the gateway")
+
+    monkeypatch.setattr("core.grokbot._client", _boom)
+    assert clear_remembered_rosters(tmp_path / "missing") == 0
+    first = _sample_handoff(creds=_Creds({}))
+    assert first.used_remembered_roster is False
+    assert load_remembered_bots(local_user())[0].name == "Developer Relations"
+
+    other = tmp_path / "ada" / "grokbot_roster.json"
+    other.parent.mkdir()
+    other.write_text("[]", encoding="utf-8")
+    unrelated = tmp_path / "local" / "credentials.json"
+    unrelated.write_text("{}", encoding="utf-8")
+
+    assert clear_remembered_rosters(tmp_path) == 2
+    assert load_remembered_bots(local_user()) == []
+    assert unrelated.is_file()
+    assert not other.exists()
+
+    seen: dict[str, object] = {}
+
+    def _decide(state: dict, questions: dict, creds: object) -> dict:
+        seen["bots"] = state["existing_bots"]
+        return {
+            "mode": "real",
+            "reason": None,
+            "answers": {
+                "placement": {"choice": "local:developer-relations", "confidence": 0.95}
+            },
+        }
+
+    monkeypatch.setattr("core.grokbot.decide", _decide)
+    fresh = build_handoff(
+        recommendation_id="R-006",
+        kind="orchestrate",
+        description="Recommend talks from Discord trends.",
+        notes=None,
+        role_name="Developer Relations",
+        tools=["discord"],
+        creds=_Creds({"JEV_API_KEY": "jv_test"}),
+    )
+    assert seen["bots"] == []
+    assert fresh.used_remembered_roster is False
+    assert fresh.action == "create_fallback"
+    assert fresh.name == "Developer Relations"
+    assert "R-006" not in fresh.name
+    assert "add this to existing bot" not in fresh.placement
+    remembered = load_remembered_bots(local_user())
+    assert len(remembered) == 1
+    assert remembered[0].name == "Developer Relations"
+    assert remembered[0].recommendation_id == "R-006"
+
+    def _again(state: dict, questions: dict, creds: object) -> dict:
+        bots = state["existing_bots"]
+        assert isinstance(bots, list)
+        assert len(bots) == 1
+        assert bots[0]["name"] == "Developer Relations"
+        return {
+            "mode": "real",
+            "reason": None,
+            "answers": {"placement": {"choice": bots[0]["id"], "confidence": 0.93}},
+        }
+
+    monkeypatch.setattr("core.grokbot.decide", _again)
+    follow = build_handoff(
+        recommendation_id="R-010",
+        kind="orchestrate",
+        description="Draft a conference talk.",
+        notes=None,
+        role_name="Developer Relations",
+        tools=["discord"],
+        creds=_Creds({"JEV_API_KEY": "jv_test"}),
+    )
+    assert follow.used_remembered_roster is True
+    assert follow.existing_bot_name == "Developer Relations"
+    assert follow.placement == (
+        "Jev recommends: add this to existing bot Developer Relations."
+    )
