@@ -187,8 +187,8 @@ def _reject_prefix_query(name: str, user: UserContext, role_id: str) -> None:
         return
     listed = ", ".join(f"{role.display_name} ({role.id})" for role in matches)
     raise ValueError(
-        f"{name!r} is a prefix of an existing role: {listed}. "
-        "Research that role from its card instead of creating a new one."
+        f"{name!r} matches the start of an existing role: {listed}. "
+        "Pick that role and use Research on its card, or type the full title."
     )
 
 

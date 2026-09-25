@@ -277,8 +277,11 @@ async def test_prefix_query_does_not_invent_a_role(
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     monkeypatch.setattr("enablement_agents.role_research.AsyncAnthropic", _boom)
 
-    with pytest.raises(ValueError, match="Developer Relations"):
+    with pytest.raises(ValueError, match="Developer Relations") as exc_info:
         await research_role("deve", _user())
+    message = str(exc_info.value)
+    assert "full title" in message
+    assert "card" in message
 
     assert not (isolated_state / "alice" / "role_cache").exists()
 

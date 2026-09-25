@@ -31,7 +31,7 @@ def test_declared_stack_for_each_role(client: TestClient) -> None:
         "support": {"intercom", "zendesk", "slack", "hubspot"},
         "customer_success": {"hubspot", "slack", "gainsight", "gong", "vitally"},
         "marketing": {"hubspot", "slack", "klaviyo", "marketo"},
-        "devrel": {"slack", "github", "discord", "discourse"},
+        "devrel": {"slack", "github", "discord", "google_docs"},
     }
     for role_id, tools in expected.items():
         response = client.get(f"/api/stacks/{role_id}")
@@ -42,6 +42,25 @@ def test_declared_stack_for_each_role(client: TestClient) -> None:
 def test_unknown_role_stack_is_404(client: TestClient) -> None:
     response = client.get("/api/stacks/not_a_role")
     assert response.status_code == 404
+    deve = client.get("/api/stacks/deve")
+    assert deve.status_code == 404
+
+
+def test_prefix_role_research_is_400(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def _boom(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("Anthropic client was constructed")
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setattr("enablement_agents.role_research.AsyncAnthropic", _boom)
+
+    response = client.post("/api/roles/research", json={"name": "deve"})
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "Developer Relations" in detail
+    assert "full title" in detail
 
 
 def test_demo_install_runs_and_is_measured(

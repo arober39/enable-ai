@@ -10,7 +10,7 @@ import pytest
 from anthropic.types import ToolUseBlock
 
 from core.identity import UserContext
-from core.tool_catalog import ToolCapability, cache_tool, load_tool
+from core.tool_catalog import ToolCapability, cache_tool, list_researched_tools, load_tool
 from enablement_agents.tool_research import research_tool
 
 _FEATURES = [
@@ -198,7 +198,7 @@ async def test_docs_reuses_existing_google_docs(
     assert not (isolated_state / "alice" / "tool_cache" / "docs.json").exists()
 
 
-async def test_gdocs_reuses_vendor_match_when_slug_differs(
+async def test_gdocs_prefers_seeded_google_docs(
     isolated_state: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -211,11 +211,12 @@ async def test_gdocs_reuses_vendor_match_when_slug_differs(
 
     capability = await research_tool("gdocs", user)
 
-    assert capability.canonical_name == "drive_docs"
+    assert capability.canonical_name == "google_docs"
     cache_dir = isolated_state / "alice" / "tool_cache"
     assert not (cache_dir / "gdocs.json").exists()
     assert not (cache_dir / "docs.json").exists()
-    assert not (cache_dir / "google_docs.json").exists()
+    assert (cache_dir / "google_docs.json").is_file()
+    assert (cache_dir / "drive_docs.json").is_file()
 
 
 async def test_docs_prefers_canonical_google_docs_over_another_vendor_match(
@@ -233,19 +234,75 @@ async def test_docs_prefers_canonical_google_docs_over_another_vendor_match(
     assert not (isolated_state / "alice" / "tool_cache" / "docs.json").exists()
 
 
-async def test_docs_is_researched_when_google_docs_is_absent(
+async def test_docs_materializes_google_docs_seed_without_a_second_file(
     isolated_state: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _install_client(
-        monkeypatch,
-        [_block(vendor="Product documentation", notes="A documentation site.")],
-    )
+    _forbid_client(monkeypatch)
 
     capability = await research_tool("docs", _user())
 
-    assert capability.canonical_name == "docs"
-    assert capability.vendor == "Product documentation"
+    assert capability.canonical_name == "google_docs"
+    assert capability.vendor == "Google Docs"
+    cache_dir = isolated_state / "alice" / "tool_cache"
+    assert not (cache_dir / "docs.json").exists()
+    assert (cache_dir / "google_docs.json").is_file()
+
+
+async def test_existing_docs_cache_collapses_into_google_docs(
+    isolated_state: Path,
+) -> None:
+    user = _user()
+    cache_tool(user, _capability(notes="kept"))
+    cache_tool(
+        user,
+        _capability(canonical_name="docs", vendor="Google Docs", notes="duplicate"),
+    )
+    cache_dir = isolated_state / "alice" / "tool_cache"
+
+    listed = list_researched_tools(user)
+
+    assert [item.canonical_name for item in listed] == ["google_docs"]
+    assert not (cache_dir / "docs.json").exists()
+    stored = json.loads((cache_dir / "google_docs.json").read_text(encoding="utf-8"))
+    assert stored["notes"] == "kept"
+
+
+async def test_docs_cache_migrates_when_google_docs_cache_is_missing(
+    isolated_state: Path,
+) -> None:
+    user = _user()
+    cache_tool(
+        user,
+        _capability(canonical_name="docs", vendor="Google Docs", notes="only copy"),
+    )
+
+    listed = list_researched_tools(user)
+
+    assert [item.canonical_name for item in listed] == ["google_docs"]
+    cache_dir = isolated_state / "alice" / "tool_cache"
+    assert not (cache_dir / "docs.json").exists()
+    stored = json.loads((cache_dir / "google_docs.json").read_text(encoding="utf-8"))
+    assert stored["canonical_name"] == "google_docs"
+    assert stored["notes"] == "only copy"
+
+
+async def test_docs_cache_for_a_documentation_site_is_left_alone(
+    isolated_state: Path,
+) -> None:
+    user = _user()
+    cache_tool(
+        user,
+        _capability(
+            canonical_name="docs",
+            vendor="Product documentation",
+            notes="site",
+        ),
+    )
+
+    listed = list_researched_tools(user)
+
+    assert [item.canonical_name for item in listed] == ["docs"]
     cache_dir = isolated_state / "alice" / "tool_cache"
     assert (cache_dir / "docs.json").is_file()
     assert not (cache_dir / "google_docs.json").exists()

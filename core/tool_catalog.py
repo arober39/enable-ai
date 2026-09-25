@@ -501,6 +501,64 @@ def delete_cached_tool(user: UserContext, name: str) -> bool:
     return True
 
 
+def _is_alias_cache_duplicate(alias: str, capability: ToolCapability) -> bool:
+    """True when this cached card is the product `alias` maps to.
+
+    A `docs.json` whose vendor is Google Docs is a duplicate. A documentation
+    site stored under `docs` is not.
+    """
+    target = _PRODUCT_ALIASES.get(alias)
+    if target is None:
+        return False
+    if capability.canonical_name == target:
+        return True
+    return _vendor_slug(capability.vendor) == target
+
+
+def collapse_aliased_duplicates(user: UserContext) -> None:
+    """Rename or delete cache files that duplicate an aliased product.
+
+    Called from list and research so an already-written `docs.json` for
+    Google Docs does not stay beside `google_docs`. When the canonical
+    cache file exists, the alias file is removed. Otherwise the alias file
+    is rewritten under the canonical name and then removed.
+    """
+    for alias, target in _PRODUCT_ALIASES.items():
+        cached = _load_cached(user, alias)
+        if cached is None or not _is_alias_cache_duplicate(alias, cached):
+            continue
+        alias_path = _cache_path(user, alias)
+        if _load_cached(user, target) is not None:
+            if alias_path.exists():
+                logger.info(
+                    "tool catalog: removed duplicate cache %s; %s already exists",
+                    alias,
+                    target,
+                )
+                alias_path.unlink()
+            continue
+        migrated = cached.model_copy(
+            update={"canonical_name": target, "source": "researched"}
+        )
+        cache_tool(user, migrated)
+        if alias_path.exists():
+            alias_path.unlink()
+        logger.info("tool catalog: moved cache %s to %s", alias, target)
+
+
+def ensure_researched_copy(user: UserContext, capability: ToolCapability) -> ToolCapability:
+    """Cache a seed match under its canonical name when the user has no copy yet.
+
+    Does not overwrite a researched card that is already stored.
+    """
+    stored = _load_cached(user, capability.canonical_name)
+    if stored is not None:
+        return stored
+    cache_tool(user, capability.model_copy(update={"source": "researched"}))
+    loaded = _load_cached(user, capability.canonical_name)
+    return loaded if loaded is not None else capability
+
+
 # ---------------------------------------------------------------------------
 # Public interface
 # ---------------------------------------------------------------------------
@@ -527,7 +585,10 @@ def list_researched_tools(user: UserContext) -> list[ToolCapability]:
     """Return only this user's researched tools, sorted by vendor.
 
     Seed files stay on disk for the factory. The picker does not list them.
+    An aliased duplicate such as `docs.json` for Google Docs is collapsed
+    before the list is built.
     """
+    collapse_aliased_duplicates(user)
     out: list[ToolCapability] = []
     for name in _cached_names(user):
         cap = _load_cached(user, name)
@@ -541,8 +602,10 @@ def list_tools(user: UserContext) -> list[ToolCapability]:
     """Return every tool available to `user`, deduplicated, sorted by vendor.
 
     User cache wins on conflict — if a seed tool was overridden by a
-    researched entry, the researched version is returned.
+    researched entry, the researched version is returned. Aliased cache
+    duplicates are collapsed first.
     """
+    collapse_aliased_duplicates(user)
     names = set(_seed_names()) | set(_cached_names(user))
     out: list[ToolCapability] = []
     for name in sorted(names):

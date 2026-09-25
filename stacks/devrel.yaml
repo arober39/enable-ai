@@ -13,6 +13,6 @@ tools:
   - name: discord
     primary_use: community
     description: Public integrator community for the planner API and vendor-catalog webhooks
-  - name: discourse
-    primary_use: documentation_forum
-    description: Docs-adjacent community Q&A and long-form threads that feed documentation gaps
+  - name: google_docs
+    primary_use: documentation
+    description: Tutorials, release notes, and other DevRel docs the community path plans against
