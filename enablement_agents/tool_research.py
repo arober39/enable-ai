@@ -19,6 +19,7 @@ from typing import Any
 
 from anthropic import AsyncAnthropic
 from anthropic.types import ToolUseBlock
+from pydantic import ValidationError
 
 from core.credentials import runtime_credentials
 from core.identity import UserContext
@@ -68,6 +69,20 @@ NEVER invent MCP server URLs — that misleads downstream code generation.
 
 Call `submit_tool_capability` exactly once with the result.
 """
+
+_VALIDATION_SUMMARY_LIMIT = 400
+
+
+def _validation_summary(exc: ValidationError) -> str:
+    """Short field errors for the UI. Omits raw input values and type tags."""
+    parts: list[str] = []
+    for err in exc.errors():
+        location = ".".join(str(part) for part in err["loc"]) or "payload"
+        parts.append(f"{location}: {err['msg']}")
+    summary = "; ".join(parts) if parts else "invalid tool capability"
+    if len(summary) > _VALIDATION_SUMMARY_LIMIT:
+        return summary[: _VALIDATION_SUMMARY_LIMIT - 3] + "..."
+    return summary
 
 
 async def research_tool(
@@ -153,8 +168,14 @@ async def research_tool(
     args["source"] = "researched"
 
     try:
+        # model_validate coerces stringified list fields (native_ai_features
+        # and siblings) before the schema check. See core.tool_catalog.
         capability = ToolCapability.model_validate(args)
-    except Exception as exc:  # noqa: BLE001
+    except ValidationError as exc:
+        raise RuntimeError(
+            f"Tool researcher: validation failed for {name!r}: {_validation_summary(exc)}"
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 — keep non-schema failures off a raw 500
         raise RuntimeError(
             f"Tool researcher: validation failed for {name!r}: {exc}"
         ) from exc
