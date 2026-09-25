@@ -68,7 +68,6 @@ import inspect
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from coordinator.schemas import EnablementPlan, Recommendation
@@ -149,7 +148,6 @@ from enablement_agents.workflow_interpreter import (
 )
 from ui.api.jobs import Job, cancel_job, get_job, spawn, start_job
 from ui.api.live_runner import run_live_plan
-from ui.api.speech import SpeechUnavailable, resolve_speech_key, synthesize
 from ui.api.synthetic import build_synthetic_plan
 
 logger = logging.getLogger("ui.api.server")
@@ -1179,28 +1177,6 @@ class RequiredCredentialsResponse(BaseModel):
 
     required: list[dict[str, str]]
     missing: list[str]
-
-
-class SpeechRequest(BaseModel):
-    """Text to read aloud with a natural voice."""
-
-    text: str = Field(min_length=1, max_length=4000)
-
-
-@app.post("/api/speech")
-async def speak(req: SpeechRequest) -> Response:
-    """MP3 for plan text. 503 when OPENAI_API_KEY is absent or the call fails."""
-    key = resolve_speech_key(LocalFileCredentialStore(_current_user()))
-    if not key:
-        raise HTTPException(
-            503,
-            "OPENAI_API_KEY is not set. Add it in Settings for a natural voice.",
-        )
-    try:
-        audio = synthesize(req.text, key)
-    except SpeechUnavailable as exc:
-        raise HTTPException(503, str(exc)) from exc
-    return Response(content=audio, media_type="audio/mpeg")
 
 
 @app.get("/api/credentials/for-workflow", response_model=RequiredCredentialsResponse)

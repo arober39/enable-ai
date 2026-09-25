@@ -153,8 +153,10 @@ class SupportEnablementAgent(EnablementAgentBase):
             "production *including* the metadata describing the orchestrator "
             "that Phase 5 will later generate. Do NOT generate orchestrator "
             "code in this turn — that is a separate operation.\n\n"
-            "Begin by reading the domain knowledge file, then proceed through "
-            "the plan production flow described in your system prompt."
+            "Begin by reading each declared tool's capability record. Domain "
+            "knowledge is background for the role. Selected tools override "
+            "the role playbook. Then proceed through the plan production "
+            "flow described in your system prompt."
         )
 
     async def produce_plan(self, stack: StackFile) -> EnablementPlan:

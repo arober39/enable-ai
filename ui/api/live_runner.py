@@ -40,8 +40,9 @@ from anthropic.types import ToolUseBlock
 
 from coordinator.schemas import EnablementPlan
 from core.identity import UserContext
+from core.plan_grounding import apply_tool_grounding
 from core.roles import Role
-from core.tool_catalog import load_tool
+from core.tool_catalog import ToolCapability, load_tool
 
 logger = logging.getLogger(__name__)
 
@@ -101,12 +102,17 @@ def _build_user_message(
 ) -> str:
     """Compose the single user-message that drives the run."""
     catalog_context = _gather_catalog_context(tools, user)
-    cap_bullet_list = "\n".join(f"- {c}" for c in role.capabilities)
     role_lower = role.display_name.lower()
     return f"""\
 You are the {role.display_name} Enablement Agent for Enable AI.
 
-Your task: produce a structured EnablementPlan for a {role_lower} function based on the declared tool stack below. Call `submit_enablement_plan` exactly once when your work is complete.
+Your task: produce a structured EnablementPlan for the tools listed below, for a person whose job is {role_lower}. Call `submit_enablement_plan` exactly once when your work is complete.
+
+## Selected tool ids
+
+{", ".join(tools)}
+
+These ids are the only tools in this run. A previous plan for this role is not an input. Do not reuse its themes.
 
 ## Declared stack ({len(tools)} tools)
 
@@ -123,19 +129,19 @@ Your task: produce a structured EnablementPlan for a {role_lower} function based
 
 ## How to think about this
 
-Compare the declared stack against these {len(role.capabilities)} AI-enabled {role_lower} capabilities:
+Selected tools override the role playbook. Invent findings and recommendations from the catalog entries above (categories, notes, native AI features, API surface). The role ({role.display_name}) only says who will use the workflow.
 
-{cap_bullet_list}
+For each selected tool, write a capability finding whose name is work that tool can actually do. Decide a status of covered, partial, gap, or redundant from the catalog data. Those four words belong only in `capability_coverage.status`. Every finding's `tools_involved` must be a subset of the selected tool ids.
 
-For each capability decide a status of covered, partial, gap, or redundant — based on the tool catalog data above. Those four words belong only in `capability_coverage.status`.
-
-Then translate findings into recommendations. Each recommendation `kind` must be exactly one of these four strings:
+Then translate those findings into recommendations that use the selected tools. Each recommendation `kind` must be exactly one of these four strings:
 - `use_native_ai` — only when the native feature is genuinely sufficient with no augmentation
 - `augment_with_custom_ai` — when native AI covers something but doesn't see cross-tool data
 - `consolidate` — when two tools redundantly cover the same capability
 - `orchestrate` — when value comes from composing multiple tools, including a capability whose status is gap
 
 Never set recommendation `kind` to covered, partial, gap, or redundant.
+
+Every recommendation must name the selected tools it uses, and `tools_affected` must be a subset of the selected tool ids. If the tools look unrelated, invent one coherent workflow that uses each tool for the job its catalog describes. Do not recommend a role-playbook theme — tutorials, code samples, docs-site work, or any other theme from domain knowledge — unless that theme appears in the catalog text above.
 
 Set a high bar for `use_native_ai`. Default toward `augment_with_custom_ai` or `orchestrate` when the value is multi-tool.
 
@@ -177,11 +183,11 @@ def _build_system_prompt(role: Role) -> str:
     return f"""\
 You are the {role.display_name} Enablement Agent for Enable AI.
 
-Your job: reason over a declared {role.display_name.lower()} tool stack and produce a structured EnablementPlan describing what AI-enabled {role.display_name.lower()} could look like with that stack.
+Your job: reason over the tools the user selected and produce a structured EnablementPlan for a {role.display_name.lower()} teammate using those tools.
 
 You output the plan by calling the `submit_enablement_plan` tool exactly once. You do not produce free-text reports. You do not call external APIs. You do not invent tools the user didn't include.
 
-Your domain knowledge follows. Ground your reasoning against it; don't freelance capability lists from memory.
+Selected tools override the role playbook. Domain knowledge below is background for the job, not a checklist of findings. Do not emit a theme from that background unless the selected tools' catalog entries are about that work. Do not reuse an earlier plan's themes when the tool list changed. If the tools look unrelated, invent one coherent cross-tool workflow from their catalog capabilities.
 
 ---
 
@@ -340,8 +346,14 @@ async def run_live_plan(
 
     args = _coerce_recommendation_kinds(_extract_submit_args(tool_uses))
     try:
-        return EnablementPlan.model_validate(args)
+        plan = EnablementPlan.model_validate(args)
     except Exception as exc:  # noqa: BLE001 — surface Pydantic error message
         raise RuntimeError(
             f"Live runner: model returned malformed plan: {exc}"
         ) from exc
+    loaded: list[ToolCapability] = []
+    for tool_name in tools:
+        cap = load_tool(user, tool_name)
+        if cap is not None:
+            loaded.append(cap)
+    return apply_tool_grounding(plan, loaded, role)

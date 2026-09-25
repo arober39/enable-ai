@@ -200,32 +200,6 @@ export function fetchHealth(): Promise<{
 
 // ----- Credentials -----
 
-export async function synthesizeSpeech(text: string): Promise<Blob> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  try {
-    const res = await fetch(`${API_BASE}/api/speech`, {
-      method: "POST",
-      signal: controller.signal,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-    });
-    if (!res.ok) {
-      let detail = `HTTP ${res.status}`;
-      try {
-        const body = await res.json();
-        if (body?.detail) detail = String(body.detail);
-      } catch {
-        /* audio errors may not be JSON */
-      }
-      throw new ApiError(res.status, detail);
-    }
-    return await res.blob();
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
 export function requiredCredentials(tools: string[]): Promise<RequiredCredentials> {
   const query = encodeURIComponent(tools.join(","));
   return fetchJson<RequiredCredentials>(`/api/credentials/required?tools=${query}`);

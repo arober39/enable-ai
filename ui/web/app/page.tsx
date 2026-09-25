@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import BuildOrchestrator from "./components/BuildOrchestrator";
 import GrokbotHandoff from "./components/GrokbotHandoff";
 import LoadingPanel from "./components/LoadingPanel";
@@ -79,6 +79,9 @@ export default function Home() {
     has_anthropic_key: boolean;
     boot_id: string;
   } | null>(null);
+  // Tool set and role the current plan was shown for. A later change drops
+  // the plan so a previous run cannot stay on screen for a new selection.
+  const planSelectionKey = useRef<string | null>(null);
 
   useEffect(() => {
     const saved = readSession();
@@ -170,6 +173,25 @@ export default function Home() {
     buildJobId,
   ]);
 
+  const selectionKey = `${selectedRole ?? ""}::${Array.from(selected).sort().join(",")}`;
+
+  useEffect(() => {
+    if (!sessionReady) return;
+    if (planSelectionKey.current === null) {
+      planSelectionKey.current = selectionKey;
+      return;
+    }
+    if (planSelectionKey.current === selectionKey) return;
+    planSelectionKey.current = selectionKey;
+    setResult(null);
+    setSelectedRecommendationId(null);
+    setSubmittedRecommendationId(null);
+    setCustomTitle("");
+    setCustomBody("");
+    setSubmittedCustomRecommendation(null);
+    setBuildJobId(null);
+  }, [sessionReady, selectionKey]);
+
   const refreshSaved = () => {
     listSavedRecommendations()
       .then(setSavedRecs)
@@ -200,7 +222,13 @@ export default function Home() {
 
   const onResearchRole = async (name: string, roleId?: string) => {
     const added = await researchRole(name, roleId);
-    setRoles(await listRoles());
+    const listed = await listRoles();
+    const next = listed.some((role) => role.id === added.id)
+      ? listed
+      : [...listed, added].sort((a, b) =>
+          a.display_name.localeCompare(b.display_name),
+        );
+    setRoles(next);
     setSelectedRoleState(added.id);
     setSelectedRole(added.id).catch((e: Error) => setError(e.message));
   };

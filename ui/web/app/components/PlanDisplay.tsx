@@ -1,11 +1,5 @@
 "use client";
 
-import SpeakButton from "./SpeakButton";
-import {
-  findingsSpeech,
-  planSpeech,
-  recommendationsSpeech,
-} from "../lib/planSpeech";
 import type { EnablementResponse, CapabilityFinding } from "../lib/types";
 
 const STATUS_STYLES: Record<CapabilityFinding["status"], string> = {
@@ -39,20 +33,14 @@ export default function PlanDisplay({ response }: Props) {
             agent: {plan.metadata.agent_name} v{plan.metadata.agent_version}
           </span>
         </div>
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold">Plan summary</h2>
-          <SpeakButton label="Listen to plan" text={planSpeech(plan)} />
-        </div>
+        <h2 className="mb-2 text-lg font-semibold">Plan summary</h2>
         <p className="text-sm leading-relaxed text-neutral-700">{plan.summary}</p>
       </div>
 
       <section>
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-base font-semibold">
-            Capability findings ({plan.capability_coverage.length})
-          </h3>
-          <SpeakButton label="Listen to findings" text={findingsSpeech(plan)} />
-        </div>
+        <h3 className="mb-2 text-base font-semibold">
+          Capability findings ({plan.capability_coverage.length})
+        </h3>
         <ul className="space-y-2">
           {plan.capability_coverage.map((f, i) => (
             <li
@@ -83,16 +71,10 @@ export default function PlanDisplay({ response }: Props) {
         </ul>
       </section>
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-neutral-500">
-          {plan.recommendations.length} recommendation(s) ready —
-          pick one to hand to Grokbot.
-        </p>
-        <SpeakButton
-          label="Listen to recommendations"
-          text={recommendationsSpeech(plan)}
-        />
-      </div>
+      <p className="text-xs text-neutral-500">
+        {plan.recommendations.length} recommendation(s) ready —
+        pick one to hand to Grokbot.
+      </p>
 
       <details className="text-xs">
         <summary className="cursor-pointer text-neutral-500">

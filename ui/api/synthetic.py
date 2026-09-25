@@ -6,31 +6,31 @@ calls just to render the UI. This module builds a plausible plan
 deterministically from the catalog data alone — same Pydantic shape as
 what a live run would produce, but without invoking Claude.
 
-It is NOT a substitute for the real agent. The recommendations are
-catalog-driven heuristics, not reasoning. The synthetic plan is labeled
-in its summary so users can tell.
+It is NOT a substitute for the real agent. Findings and recommendations
+are built from the selected tools' catalog capabilities (categories,
+notes, native features), with the role as who the workflow is for. The
+synthetic plan is labeled in its summary so users can tell.
 """
 
 from __future__ import annotations
 
 import hashlib
 from datetime import UTC, datetime
-from typing import Literal
 
 from coordinator.schemas import (
-    CapabilityFinding,
     EnablementPlan,
     OrchestratorPRPlan,
     PlanMetadata,
-    Recommendation,
 )
 from core.credentials import Credentials
 from core.identity import UserContext
-from core.jev import classify_coverage
+from core.plan_grounding import (
+    grounded_findings,
+    grounded_recommendations,
+    grounded_summary,
+)
 from core.roles import Role
 from core.tool_catalog import ToolCapability, load_tool
-
-_Status = Literal["covered", "partial", "gap", "redundant"]
 
 
 def build_synthetic_plan(
@@ -43,116 +43,29 @@ def build_synthetic_plan(
 
     Reads each tool through `core.tool_catalog.load_tool` so researched
     tools and seed tools are treated identically. The synthetic plan
-    stamps `role.department` / `role.agent_name`; capability findings
-    remain catalog-driven heuristics.
+    stamps `role.department` / `role.agent_name`. Findings and
+    recommendations follow the selected tools' catalog domains.
     """
-    findings: list[CapabilityFinding] = []
-    recs: list[Recommendation] = []
-    mcp_used: list[str] = []
-    mcp_to_generate: list[str] = []
     loaded: list[ToolCapability] = []
-
+    missing: list[str] = []
     for tool_name in tools:
         cap = load_tool(user, tool_name)
         if cap is None:
-            findings.append(
-                CapabilityFinding(
-                    capability="catalog_lookup",
-                    status="gap",
-                    tools_involved=[tool_name],
-                    notes=(
-                        f"No catalog entry or cached research for "
-                        f"'{tool_name}' — record as gap."
-                    ),
-                )
-            )
+            missing.append(tool_name)
             continue
         loaded.append(cap)
-        others = [name for name in tools if name != tool_name]
-        judged = classify_coverage(
-            tool_name=tool_name,
-            categories=list(cap.categories),
-            capability=None,
-            other_tools=others,
-            creds=creds,
-        )
-        status: _Status = judged["status"]
-        note = cap.notes or ""
-        source_note = f"Coverage status source: {judged['source']} ({judged['mode']})."
-        findings.append(
-            CapabilityFinding(
-                capability=judged["capability"],
-                status=status,
-                tools_involved=[tool_name],
-                notes=f"{note}\n{source_note}".strip(),
-            )
-        )
-        if cap.mcp_server.available:
-            mcp_used.append(tool_name)
-        else:
-            mcp_to_generate.append(tool_name)
 
-    # Recommendations heuristics
-    rec_id = 1
-    if mcp_used:
-        recs.append(
-            Recommendation(
-                id=f"R-{rec_id:03d}",
-                kind="orchestrate",
-                description=(
-                    f"Compose {', '.join(mcp_used)} into a unified "
-                    f"{role.display_name.lower()} surface via their existing "
-                    "MCP servers."
-                ),
-                tools_affected=list(mcp_used),
-                effort="medium",
-                notes=None,
-            )
+    findings = grounded_findings(loaded, missing=missing, creds=creds)
+    recs = grounded_recommendations(loaded, role)
+    summary = grounded_summary(loaded, role, synthetic=True)
+    if missing:
+        summary = (
+            f"{summary} Missing catalog entries: {', '.join(missing)}."
         )
-        rec_id += 1
-    if mcp_to_generate:
-        recs.append(
-            Recommendation(
-                id=f"R-{rec_id:03d}",
-                kind="augment_with_custom_ai",
-                description=(
-                    f"Generate a minimal MCP server stub for "
-                    f"{', '.join(mcp_to_generate)} so the orchestrator can "
-                    "read the data it needs."
-                ),
-                tools_affected=list(mcp_to_generate),
-                effort="medium",
-                notes="No vendor-maintained MCP server at build time.",
-            )
-        )
-        rec_id += 1
-    # One use_native_ai recommendation if any tool has native AI features.
-    for cap in loaded:
-        if cap.native_ai_features:
-            feature = cap.native_ai_features[0]
-            recs.append(
-                Recommendation(
-                    id=f"R-{rec_id:03d}",
-                    kind="use_native_ai",
-                    description=(
-                        f"Use {cap.vendor}'s {feature.name} as-is for the "
-                        "capabilities it already covers well."
-                    ),
-                    tools_affected=[cap.canonical_name],
-                    effort="small",
-                    notes=None,
-                )
-            )
-            rec_id += 1
-            break
-
-    summary = (
-        f"[DEMO/SYNTHETIC] Catalog-driven {role.display_name.lower()} "
-        f"enablement plan over {len(tools)} tools ({', '.join(tools)}). "
-        "This plan is built deterministically from the tool catalog — set "
-        "ANTHROPIC_API_KEY and ENABLE_AI_DEMO_MODE=false to invoke the "
-        f"real {role.display_name} Enablement Agent for a reasoning-driven plan."
-    )
+    mcp_used = [cap.canonical_name for cap in loaded if cap.mcp_server.available]
+    mcp_to_generate = [
+        cap.canonical_name for cap in loaded if not cap.mcp_server.available
+    ]
 
     return EnablementPlan(
         department=role.department,

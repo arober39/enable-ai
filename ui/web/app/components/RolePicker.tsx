@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { visiblePickerItems } from "../lib/pickerItems";
 import type { RoleSummary } from "../lib/types";
 import Spinner from "./Spinner";
 
@@ -30,15 +31,12 @@ export default function RolePicker({
   const [error, setError] = useState<string | null>(null);
 
   const q = query.trim().toLowerCase();
-  const visible = q
-    ? roles.filter(
-        (r) =>
-          r.display_name.toLowerCase().includes(q) ||
-          r.id.toLowerCase().includes(q) ||
-          r.department.toLowerCase().includes(q) ||
-          r.description.toLowerCase().includes(q),
-      )
-    : roles;
+  const matchesRole = (role: RoleSummary, queryText: string) =>
+    role.display_name.toLowerCase().includes(queryText) ||
+    role.id.toLowerCase().includes(queryText) ||
+    role.department.toLowerCase().includes(queryText) ||
+    role.description.toLowerCase().includes(queryText);
+  const visible = q ? roles.filter((role) => matchesRole(role, q)) : roles;
 
   const exactMatch =
     q.length > 0 &&
@@ -47,7 +45,14 @@ export default function RolePicker({
         r.id.toLowerCase() === q || r.display_name.toLowerCase() === q,
     );
   const canResearch = q.length >= _MIN_QUERY && !exactMatch && !researching;
-  const shown = q ? visible : visible.slice(0, _PREVIEW_COUNT);
+  const shown = visiblePickerItems({
+    items: roles,
+    query,
+    matches: matchesRole,
+    isSelected: (role) => role.id === selected,
+    previewCount: _PREVIEW_COUNT,
+    pinSelected: true,
+  });
 
   const researchSeed = async (role: RoleSummary) => {
     setResearchingId(role.id);

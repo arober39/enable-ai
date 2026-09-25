@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { visiblePickerItems } from "../lib/pickerItems";
 import type { ToolSummary } from "../lib/types";
 import Spinner from "./Spinner";
 
@@ -29,14 +30,11 @@ export default function ToolPicker({
   const [error, setError] = useState<string | null>(null);
 
   const q = query.trim().toLowerCase();
-  const visible = q
-    ? tools.filter(
-        (t) =>
-          t.vendor.toLowerCase().includes(q) ||
-          t.name.toLowerCase().includes(q) ||
-          t.categories.some((c) => c.toLowerCase().includes(q)),
-      )
-    : tools;
+  const matchesTool = (tool: ToolSummary, queryText: string) =>
+    tool.vendor.toLowerCase().includes(queryText) ||
+    tool.name.toLowerCase().includes(queryText) ||
+    tool.categories.some((category) => category.toLowerCase().includes(queryText));
+  const visible = q ? tools.filter((tool) => matchesTool(tool, q)) : tools;
 
   const exactMatch =
     q.length > 0 &&
@@ -44,7 +42,14 @@ export default function ToolPicker({
       (t) => t.name === q || t.vendor.toLowerCase() === q,
     );
   const canResearch = q.length >= _MIN_QUERY && !exactMatch && !researching;
-  const shown = q ? visible : visible.slice(0, _PREVIEW_COUNT);
+  const shown = visiblePickerItems({
+    items: tools,
+    query,
+    matches: matchesTool,
+    isSelected: (tool) => selected.has(tool.name),
+    previewCount: _PREVIEW_COUNT,
+    pinSelected: true,
+  });
 
   const tryResearch = async () => {
     setResearching(true);
