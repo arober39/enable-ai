@@ -1,6 +1,6 @@
 """Copy-paste Grok Bot handoff, with an optional Jev placement.
 
-Step 7 asks Jev whether the recommendation is a new bot or belongs on an
+Step 6 asks Jev whether the recommendation is a new bot or belongs on an
 existing one, then shows text the user pastes into Grok Bot. It never calls
 createAgent or updateAgent. listAgents runs only when gateway credentials
 are present. Bots named by earlier handoffs in this process are remembered
@@ -8,6 +8,10 @@ under `agent-state/<user_id>/grokbot_roster.json` and sent to Jev even when
 the gateway is unset. The API deletes those files on startup. A remembered
 row uses the role title the handoff tells the user to paste.
 `apply_recommendation` remains for a later path that would write the bot itself.
+
+The API may also POST the finished handoff to a Grok Bot webhook
+(`core.grokbot_webhook`) when both webhook settings are in the environment
+or `.env`. That delivery does not replace the paste text.
 """
 
 from __future__ import annotations
@@ -40,6 +44,9 @@ logger = logging.getLogger(__name__)
 
 URL_KEY = "GROKBOT_GATEWAY_URL"
 TOKEN_KEY = "SAND_GATEWAY_TOKEN"
+WEBHOOK_URL_ENV = "GROKBOT_HANDOFF_WEBHOOK_URL"
+WEBHOOK_KEY_ENV = "GROKBOT_HANDOFF_WEBHOOK_KEY"
+_ENV_ONLY_CREDENTIALS = {JEV_CRED, TYPESAFE_CRED, WEBHOOK_URL_ENV, WEBHOOK_KEY_ENV}
 _NEW = "new_bot"
 _EXISTING = "existing_bot"
 _NAME_LIMIT = 80
@@ -76,13 +83,24 @@ class GrokbotHandoff(BaseModel):
         default=False,
         description="True when placement saw bots remembered from earlier handoffs.",
     )
+    webhook_status: Literal["sent", "failed"] | None = Field(
+        default=None,
+        description=(
+            "sent or failed when a Grok Bot webhook was configured. "
+            "None when the webhook was not attempted."
+        ),
+    )
+    webhook_message: str | None = Field(
+        default=None,
+        description="One-line step 6 status. None when the webhook was not attempted.",
+    )
 
 
 class HandoffCredentials(Credentials):
     """Process environment, then the repo `.env` file, then Settings.
 
-    `TYPESAFE_API_KEY` and `JEV_API_KEY` are never taken from Settings.
-    They belong in `.env`.
+    `TYPESAFE_API_KEY`, `JEV_API_KEY`, and the Grok Bot handoff webhook
+    settings are never taken from Settings. They belong in `.env`.
     """
 
     def __init__(self, store: Credentials) -> None:
@@ -95,7 +113,7 @@ class HandoffCredentials(Credentials):
         from_file = _file_env().get(key)
         if from_file:
             return from_file
-        if key in {JEV_CRED, TYPESAFE_CRED}:
+        if key in _ENV_ONLY_CREDENTIALS:
             return None
         return self._store.get(key)
 
@@ -561,7 +579,7 @@ def apply_recommendation(
 ) -> dict[str, Any]:
     """Create or update one Grok Bot after a confident Jev placement.
 
-    Not used by the step 7 UI. That screen calls `build_handoff` and the
+    Not used by the step 6 UI. That screen calls `build_handoff` and the
     user pastes the result into Grok Bot.
     """
     gateway = _gateway(creds)

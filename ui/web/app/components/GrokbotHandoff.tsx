@@ -162,6 +162,18 @@ export default function GrokbotHandoff({
           {handoff.placement}
         </p>
       )}
+      {handoff?.webhook_message && (
+        <p
+          className={
+            "text-xs " +
+            (handoff.webhook_status === "failed"
+              ? "text-amber-800"
+              : "text-emerald-800")
+          }
+        >
+          {handoff.webhook_message}
+        </p>
+      )}
       {handoff?.used_remembered_roster && (
         <p className="text-xs text-neutral-500">
           Using bots remembered from earlier handoffs.

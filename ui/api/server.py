@@ -18,7 +18,7 @@ Endpoints:
   - GET    /api/outcomes                       — recent measured workflow runs for this user
   - GET    /api/outcomes/summary               — success and real-call rates per recommendation
   - POST   /api/rollback                       — uninstall the workflow for one recommendation
-  - POST   /api/grokbot/handoff               — copy-paste Grok Bot text; Jev sees remembered bots
+  - POST   /api/grokbot/handoff               — copy-paste Grok Bot text; optional webhook POST
   - POST   /api/generate-orchestrator          — (LEGACY 1.4) 4-stage codegen pipeline
   - POST   /api/run-orchestrator               — (LEGACY 1.4) run codegen-produced orchestrator
   - GET    /api/saved-recommendations          — list user's saved-for-later recs
@@ -77,6 +77,7 @@ from core.credentials import (
 )
 from core.grokbot import GrokbotHandoff, HandoffCredentials, build_handoff
 from core.grokbot_roster import clear_remembered_rosters
+from core.grokbot_webhook import deliver_handoff_webhook
 from core.identity import UserContext, local_user
 from core.jev import label_escalation
 from core.outcomes import (
@@ -939,10 +940,14 @@ async def delete_workflow_endpoint(role_id: str) -> dict[str, bool]:
 
 
 class GrokbotHandoffRequest(BaseModel):
-    """Fields for a copy-paste Grok Bot assignment. Nothing is sent to Grok Bot.
+    """Fields for a copy-paste Grok Bot assignment.
 
     ``recommendation_id`` does not have to belong to the current plan.
     A recommendation the user wrote on step 5 is sent as ``R-CUSTOM``.
+
+    When both webhook settings are in the environment or ``.env``, the
+    server also POSTs this assignment. Copy-paste still works when they
+    are missing or the POST fails.
     """
 
     recommendation_id: str = Field(
@@ -964,10 +969,14 @@ def grokbot_handoff(req: GrokbotHandoffRequest) -> GrokbotHandoff:
     Does not call createAgent or updateAgent. listAgents runs only when
     gateway credentials are set. Bots remembered from earlier handoffs
     in this process are included either way. A restart clears that roster.
+
+    After the handoff is built, POST it to the Grok Bot webhook when both
+    webhook settings are configured. A missing or failed webhook still
+    returns the paste text.
     """
     user = _current_user()
     creds = HandoffCredentials(LocalFileCredentialStore(user))
-    return build_handoff(
+    handoff = build_handoff(
         recommendation_id=req.recommendation_id,
         kind=req.kind,
         description=req.description,
@@ -978,6 +987,28 @@ def grokbot_handoff(req: GrokbotHandoffRequest) -> GrokbotHandoff:
         creds=creds,
         user=user,
     )
+    delivery = deliver_handoff_webhook(
+        creds,
+        name=handoff.name,
+        title=handoff.title,
+        description=handoff.description,
+        placement=handoff.placement,
+        action=handoff.action,
+        recommendation_id=req.recommendation_id,
+        role_name=req.role_name,
+        role_id=req.role_id,
+        tools=req.tools,
+        existing_bot_name=handoff.existing_bot_name,
+    )
+    if delivery.status == "sent":
+        return handoff.model_copy(
+            update={"webhook_status": "sent", "webhook_message": delivery.message}
+        )
+    if delivery.status == "failed":
+        return handoff.model_copy(
+            update={"webhook_status": "failed", "webhook_message": delivery.message}
+        )
+    return handoff
 
 
 class RunWorkflowRequest(BaseModel):

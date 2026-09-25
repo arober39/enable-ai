@@ -114,6 +114,8 @@ def test_handoff_text_assigns_the_work_and_lists_the_tools() -> None:
     assert "Use the community themes." in parsed.description
     assert parsed.name == "Developer Relations"
     assert parsed.title == "Developer Relations"
+    assert parsed.webhook_status is None
+    assert parsed.webhook_message is None
 
 
 def test_missing_jev_key_says_so_and_defaults_to_a_new_bot(

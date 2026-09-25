@@ -242,6 +242,8 @@ export type GrokbotHandoffText = {
   action: "create" | "update" | "create_fallback";
   existing_bot_name: string | null;
   used_remembered_roster: boolean;
+  webhook_status: "sent" | "failed" | null;
+  webhook_message: string | null;
 };
 
 export function fetchGrokbotHandoff(args: {
