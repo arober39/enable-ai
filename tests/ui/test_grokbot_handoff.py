@@ -173,6 +173,46 @@ def test_handoff_endpoint_remembers_a_bot_and_offers_it_next_time(
     assert [bot.recommendation_id for bot in load_remembered_bots(local_user())] == ["R-010"]
 
 
+def test_handoff_endpoint_accepts_a_user_written_recommendation(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """R-CUSTOM is not a plan id. Submit still returns paste text and remembers the bot."""
+    _isolate(monkeypatch, tmp_path)
+
+    def _boom(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("gateway writes and listAgents are not required")
+
+    monkeypatch.setattr("core.grokbot._client", _boom)
+    description = (
+        "Friday forum recap\n\nDraft a Friday forum recap from unread threads."
+    )
+    response = TestClient(app).post(
+        "/api/grokbot/handoff",
+        json={
+            "recommendation_id": "R-CUSTOM",
+            "kind": "custom",
+            "description": description,
+            "role_name": "Developer Relations",
+            "role_id": "devrel",
+            "tools": ["discord"],
+        },
+    )
+    assert response.status_code == 200, response.text
+    handoff = GrokbotHandoff.model_validate(response.json())
+    assert handoff.action == "create_fallback"
+    assert handoff.name == "Developer Relations"
+    assert "R-CUSTOM" not in handoff.name
+    assert "R-CUSTOM" not in handoff.description
+    assert description in handoff.description
+    assert "createAgent" not in response.text
+    assert "updateAgent" not in response.text
+    stored = load_remembered_bots(local_user())
+    assert [bot.recommendation_id for bot in stored] == ["R-CUSTOM"]
+    assert stored[0].name == "Developer Relations"
+    assert stored[0].role_id == "devrel"
+
+
 async def test_server_startup_deletes_every_remembered_roster(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

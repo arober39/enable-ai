@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { fetchGrokbotHandoff, type GrokbotHandoffText } from "../lib/api";
-import type { Recommendation } from "../lib/types";
+import type { HandoffRecommendation } from "../lib/customRecommendation";
 import Spinner from "./Spinner";
 
 interface Props {
-  recommendation: Recommendation;
+  recommendation: HandoffRecommendation;
   roleName: string;
   roleId?: string | null;
   tools: string[];

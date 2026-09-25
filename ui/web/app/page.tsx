@@ -25,6 +25,13 @@ import {
   startEnablementJob,
 } from "./lib/api";
 import {
+  buildCustomRecommendation,
+  CUSTOM_RECOMMENDATION_ID,
+  isCustomRecommendationId,
+  sameHandoffRecommendation,
+  type HandoffRecommendation,
+} from "./lib/customRecommendation";
+import {
   readSession,
   SESSION_KEY,
   writePendingKeys,
@@ -54,6 +61,10 @@ export default function Home() {
   const [submittedRecommendationId, setSubmittedRecommendationId] = useState<
     string | null
   >(null);
+  const [customTitle, setCustomTitle] = useState("");
+  const [customBody, setCustomBody] = useState("");
+  const [submittedCustomRecommendation, setSubmittedCustomRecommendation] =
+    useState<HandoffRecommendation | null>(null);
   const [handoffSubmitVersion, setHandoffSubmitVersion] = useState(0);
 
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +93,13 @@ export default function Home() {
           setResult(saved.result);
           setSelectedRecommendationId(saved.selectedRecommendationId ?? null);
           setSubmittedRecommendationId(saved.submittedRecommendationId ?? null);
+          setCustomTitle(saved.customRecommendationTitle ?? "");
+          setCustomBody(saved.customRecommendationBody ?? "");
+          setSubmittedCustomRecommendation(
+            saved.submittedCustomRecommendation?.id === CUSTOM_RECOMMENDATION_ID
+              ? saved.submittedCustomRecommendation
+              : null,
+          );
           setEnablementJobId(saved.enablementJobId ?? null);
           setEnablementStartedAt(saved.enablementStartedAt ?? null);
           setBuildJobId(saved.buildJobId ?? null);
@@ -93,6 +111,9 @@ export default function Home() {
         setResult(null);
         setSelectedRecommendationId(null);
         setSubmittedRecommendationId(null);
+        setCustomTitle("");
+        setCustomBody("");
+        setSubmittedCustomRecommendation(null);
         setEnablementJobId(null);
         setEnablementStartedAt(null);
         setBuildJobId(null);
@@ -124,6 +145,9 @@ export default function Home() {
       result,
       selectedRecommendationId,
       submittedRecommendationId,
+      customRecommendationTitle: customTitle,
+      customRecommendationBody: customBody,
+      submittedCustomRecommendation,
       enablementJobId,
       enablementStartedAt,
       buildJobId,
@@ -138,6 +162,9 @@ export default function Home() {
     result,
     selectedRecommendationId,
     submittedRecommendationId,
+    customTitle,
+    customBody,
+    submittedCustomRecommendation,
     enablementJobId,
     enablementStartedAt,
     buildJobId,
@@ -209,6 +236,9 @@ export default function Home() {
     setResult(null);
     setSelectedRecommendationId(null);
     setSubmittedRecommendationId(null);
+    setCustomTitle("");
+    setCustomBody("");
+    setSubmittedCustomRecommendation(null);
     setBuildJobId(null);
     try {
       const job = await startEnablementJob(
@@ -243,9 +273,14 @@ export default function Home() {
           const plan = job.result;
           setResult(plan);
           setSubmittedRecommendationId(null);
+          setSubmittedCustomRecommendation(null);
+          setCustomTitle("");
+          setCustomBody("");
           const ids = new Set(plan.plan.recommendations.map((rec) => rec.id));
           setSelectedRecommendationId((current) =>
-            current && ids.has(current) ? current : null,
+            current && !isCustomRecommendationId(current) && ids.has(current)
+              ? current
+              : null,
           );
         } else setError(job.error ?? "Enablement run failed.");
       } catch (e) {
@@ -284,23 +319,48 @@ export default function Home() {
     }
   };
 
-  const draftRecommendation =
+  const customSelected = isCustomRecommendationId(selectedRecommendationId);
+  const systemDraft =
     result?.plan.recommendations.find((rec) => rec.id === selectedRecommendationId) ??
     null;
-  const submittedRecommendation =
-    result?.plan.recommendations.find((rec) => rec.id === submittedRecommendationId) ??
-    null;
-  const handoffHint =
-    submittedRecommendation &&
-    draftRecommendation &&
-    draftRecommendation.id !== submittedRecommendation.id
+  const customDraft = customSelected
+    ? buildCustomRecommendation(
+        { title: customTitle, body: customBody },
+        Array.from(selected),
+      )
+    : null;
+  const submittedRecommendation: HandoffRecommendation | null =
+    isCustomRecommendationId(submittedRecommendationId)
+      ? submittedCustomRecommendation
+      : (result?.plan.recommendations.find(
+          (rec) => rec.id === submittedRecommendationId,
+        ) ?? null);
+  const draftId = customSelected
+    ? CUSTOM_RECOMMENDATION_ID
+    : (systemDraft?.id ?? null);
+  const customDirty =
+    customSelected &&
+    isCustomRecommendationId(submittedRecommendation?.id) &&
+    !sameHandoffRecommendation(customDraft, submittedRecommendation);
+  const handoffHint = !submittedRecommendation
+    ? "Select a recommendation and press Submit to hand it to Grokbot."
+    : (draftId && draftId !== submittedRecommendation.id) || customDirty
       ? `The Grokbot handoff stays on ${submittedRecommendation.id} until you submit again.`
-      : !submittedRecommendation
-        ? "Select a recommendation and press Submit to hand it to Grokbot."
-        : null;
+      : null;
+  const canSubmitRecommendation = customSelected
+    ? customDraft != null
+    : systemDraft != null;
   const submitRecommendation = () => {
-    if (!draftRecommendation) return;
-    setSubmittedRecommendationId(draftRecommendation.id);
+    if (customSelected) {
+      if (!customDraft) return;
+      setSubmittedCustomRecommendation(customDraft);
+      setSubmittedRecommendationId(customDraft.id);
+      setHandoffSubmitVersion((version) => version + 1);
+      return;
+    }
+    if (!systemDraft) return;
+    setSubmittedCustomRecommendation(null);
+    setSubmittedRecommendationId(systemDraft.id);
     setHandoffSubmitVersion((version) => version + 1);
   };
   const roleName =
@@ -426,7 +486,8 @@ export default function Home() {
             5. Pick one recommendation
           </h2>
           <p className="mb-3 text-sm text-neutral-700">
-            Pick the recommendation to hand to Grokbot. Grok Bot does the work.
+            Pick a recommendation to hand to Grokbot, or suggest your own.
+            Grok Bot does the work.
           </p>
           <BuildOrchestrator
             plan={result.plan}
@@ -434,15 +495,19 @@ export default function Home() {
             selectedTools={Array.from(selected)}
             selectedRecommendationId={selectedRecommendationId}
             onSelectRecommendation={setSelectedRecommendationId}
+            customTitle={customTitle}
+            customBody={customBody}
+            onCustomTitleChange={setCustomTitle}
+            onCustomBodyChange={setCustomBody}
             onSaved={refreshSaved}
           />
           <button
             type="button"
-            disabled={draftRecommendation == null}
+            disabled={!canSubmitRecommendation}
             onClick={submitRecommendation}
             className={
               "mt-4 inline-flex items-center gap-2 rounded-md px-4 py-2 font-semibold text-white transition " +
-              (draftRecommendation == null
+              (!canSubmitRecommendation
                 ? "cursor-not-allowed bg-neutral-400"
                 : "bg-accent hover:bg-accent/90")
             }

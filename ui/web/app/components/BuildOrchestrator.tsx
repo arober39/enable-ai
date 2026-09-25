@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { saveRecommendation } from "../lib/api";
+import { CUSTOM_RECOMMENDATION_ID } from "../lib/customRecommendation";
 import type { EnablementPlan, Recommendation } from "../lib/types";
 
 const KIND_STYLES: Record<Recommendation["kind"], string> = {
@@ -24,6 +25,10 @@ interface Props {
   onSaved: () => void;
   selectedRecommendationId: string | null;
   onSelectRecommendation: (id: string) => void;
+  customTitle: string;
+  customBody: string;
+  onCustomTitleChange: (value: string) => void;
+  onCustomBodyChange: (value: string) => void;
 }
 
 export default function BuildOrchestrator({
@@ -33,6 +38,10 @@ export default function BuildOrchestrator({
   onSaved,
   selectedRecommendationId,
   onSelectRecommendation,
+  customTitle,
+  customBody,
+  onCustomTitleChange,
+  onCustomBodyChange,
 }: Props) {
   const recs = plan.recommendations;
   const selectedRecId = recs.some((rec) => rec.id === selectedRecommendationId)
@@ -62,17 +71,19 @@ export default function BuildOrchestrator({
     }
   };
 
-  if (recs.length === 0) {
-    return (
-      <div className="rounded-lg border border-neutral-300 bg-white p-4 text-sm text-neutral-500">
-        Plan returned no recommendations.
-      </div>
-    );
-  }
+  const customSelected = selectedRecommendationId === CUSTOM_RECOMMENDATION_ID;
+  const selectCustom = () => {
+    if (!customSelected) onSelectRecommendation(CUSTOM_RECOMMENDATION_ID);
+  };
 
   return (
     <div className="space-y-4">
-      <ul className="space-y-2">
+      {recs.length === 0 ? (
+        <div className="rounded-lg border border-neutral-300 bg-white p-4 text-sm text-neutral-500">
+          Plan returned no recommendations.
+        </div>
+      ) : (
+        <ul className="space-y-2">
         {recs.map((r) => {
           const isSelected = r.id === selectedRecId;
           const isSaving = savingIds.has(r.id);
@@ -140,7 +151,81 @@ export default function BuildOrchestrator({
             </li>
           );
         })}
-      </ul>
+        </ul>
+      )}
+      <div
+        className={
+          "rounded-md border p-3 transition " +
+          (customSelected
+            ? "border-accent bg-accent/5"
+            : "border-neutral-200 bg-white")
+        }
+      >
+        <div className="flex items-start gap-3">
+          <input
+            id="rec-custom"
+            type="radio"
+            name="rec-pick"
+            className="mt-1 h-4 w-4 accent-current text-accent"
+            checked={customSelected}
+            onChange={selectCustom}
+          />
+          <div className="flex-1">
+            <label htmlFor="rec-custom" className="cursor-pointer">
+              <span className="font-mono text-sm">{CUSTOM_RECOMMENDATION_ID}</span>
+              <span className="mt-1 block text-sm font-medium text-neutral-900">
+                Suggest your own
+              </span>
+            </label>
+            <p className="mt-1 text-sm text-neutral-600">
+              {recs.length === 0
+                ? "Write a recommendation to hand to Grokbot."
+                : "Use this instead of a recommendation above."}
+            </p>
+            <div className="mt-3 space-y-3">
+              <label htmlFor="custom-rec-title" className="block">
+                <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                  Title{" "}
+                  <span className="font-normal normal-case text-neutral-400">
+                    (optional)
+                  </span>
+                </span>
+                <input
+                  id="custom-rec-title"
+                  type="text"
+                  value={customTitle}
+                  maxLength={80}
+                  placeholder="Short name"
+                  onFocus={selectCustom}
+                  onChange={(event) => {
+                    selectCustom();
+                    onCustomTitleChange(event.target.value);
+                  }}
+                  className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm font-normal normal-case text-neutral-900"
+                />
+              </label>
+              <label htmlFor="custom-rec-body" className="block">
+                <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                  Recommendation
+                </span>
+                <textarea
+                  id="custom-rec-body"
+                  required
+                  rows={4}
+                  value={customBody}
+                  placeholder="What should this bot do?"
+                  onFocus={selectCustom}
+                  onChange={(event) => {
+                    selectCustom();
+                    onCustomBodyChange(event.target.value);
+                  }}
+                  className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm font-normal normal-case text-neutral-900"
+                />
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
       {error && (
         <p className="text-sm text-rose-700">
           <strong>Error:</strong> {error}

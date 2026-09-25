@@ -5,8 +5,9 @@ import path from "node:path";
 import { expect, test } from "@playwright/test";
 
 /**
- * Step 5 selects a recommendation. Step 6 (the Grok Bot handoff) stays
- * on the last submitted recommendation until Submit is pressed again.
+ * Step 5 selects a recommendation, or a recommendation the user writes.
+ * Step 6 (the Grok Bot handoff) stays on the last submitted recommendation
+ * until Submit is pressed again.
  */
 
 function repoRoot(): string {
@@ -118,4 +119,90 @@ test("handoff appears only after submit and keeps the last submitted recommendat
   ).toBeVisible();
   await expect(firstHeading).toHaveCount(0);
   await expect(remembered).toBeVisible();
+});
+
+test("a custom recommendation submits into the same handoff", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: /^Developer Relations/ })).toBeVisible();
+  await page.getByRole("button", { name: /^Developer Relations/ }).click();
+  await page.getByRole("button", { name: /^Intercom/ }).click();
+  await page.getByRole("button", { name: /^Zendesk/ }).click();
+
+  await page.getByRole("button", { name: /Run \(demo\)/i }).click();
+  await expect(page.getByRole("heading", { name: /Plan summary/i })).toBeVisible({
+    timeout: 90_000,
+  });
+
+  const submit = page.getByRole("button", { name: "Submit", exact: true });
+  const custom = page.getByRole("radio", { name: /Suggest your own/ });
+  const recommendation = page.getByRole("textbox", { name: "Recommendation" });
+  const title = page.getByRole("textbox", { name: /Title/ });
+  const cards = page.locator("ul li").filter({ has: page.getByRole("radio") });
+  await expect(cards).toHaveCount(2);
+  const systemId = (await cards.nth(0).locator(".font-mono").innerText()).trim();
+
+  await expect(page.getByRole("heading", { name: /6\. Hand / })).toHaveCount(0);
+  await custom.check();
+  await expect(submit).toBeDisabled();
+  await recommendation.fill("   ");
+  await expect(submit).toBeDisabled();
+  await expect(page.getByRole("heading", { name: /6\. Hand / })).toHaveCount(0);
+
+  const body = "Draft a Friday forum recap from unread threads.";
+  await title.fill("Friday forum recap");
+  await recommendation.fill(body);
+  await expect(custom).toBeChecked();
+  await expect(cards.nth(0).getByRole("radio")).not.toBeChecked();
+  await expect(submit).toBeEnabled();
+
+  await cards.nth(0).getByRole("radio").check();
+  await expect(custom).not.toBeChecked();
+  await expect(page.getByRole("heading", { name: /6\. Hand / })).toHaveCount(0);
+
+  await custom.check();
+  await expect(cards.nth(0).getByRole("radio")).not.toBeChecked();
+  await submit.click();
+
+  const customHeading = page.getByRole("heading", {
+    name: "6. Hand R-CUSTOM to Grokbot",
+  });
+  await expect(customHeading).toBeVisible();
+  await expect(page.getByText("Preparing the assignment…")).toHaveCount(0);
+  const assignment = page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: /6\. Hand / }) })
+    .locator("pre");
+  await expect(assignment).toContainText(body);
+  await expect(assignment).toContainText("Friday forum recap");
+  await expect(assignment).not.toContainText("R-CUSTOM");
+  const botName = page.getByText("Bot name", { exact: true }).locator("..");
+  await expect(botName).toContainText("Developer Relations");
+  await expect(botName).not.toContainText("R-CUSTOM");
+
+  await cards.nth(0).getByRole("radio").check();
+  await expect(customHeading).toBeVisible();
+  await expect(
+    page.getByText("The Grokbot handoff stays on R-CUSTOM until you submit again."),
+  ).toBeVisible();
+
+  await submit.click();
+  const systemHeading = page.getByRole("heading", {
+    name: `6. Hand ${systemId} to Grokbot`,
+  });
+  await expect(systemHeading).toBeVisible();
+  await expect(customHeading).toHaveCount(0);
+
+  await recommendation.fill(`${body} Add the unanswered questions.`);
+  await expect(custom).toBeChecked();
+  await expect(systemHeading).toBeVisible();
+  await expect(
+    page.getByText(
+      `The Grokbot handoff stays on ${systemId} until you submit again.`,
+    ),
+  ).toBeVisible();
+
+  await submit.click();
+  await expect(customHeading).toBeVisible();
+  await expect(systemHeading).toHaveCount(0);
+  await expect(assignment).toContainText("Add the unanswered questions.");
 });

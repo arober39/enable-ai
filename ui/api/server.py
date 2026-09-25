@@ -941,9 +941,16 @@ async def delete_workflow_endpoint(role_id: str) -> dict[str, bool]:
 
 
 class GrokbotHandoffRequest(BaseModel):
-    """Fields for a copy-paste Grok Bot assignment. Nothing is sent to Grok Bot."""
+    """Fields for a copy-paste Grok Bot assignment. Nothing is sent to Grok Bot.
 
-    recommendation_id: str = Field(min_length=1)
+    ``recommendation_id`` does not have to belong to the current plan.
+    A recommendation the user wrote on step 5 is sent as ``R-CUSTOM``.
+    """
+
+    recommendation_id: str = Field(
+        min_length=1,
+        description="Plan id such as R-001, or R-CUSTOM for a recommendation the user wrote.",
+    )
     kind: str = Field(min_length=1)
     description: str = Field(min_length=1)
     notes: str | None = None

@@ -1,3 +1,4 @@
+import type { HandoffRecommendation } from "./customRecommendation";
 import type { EnablementResponse } from "./types";
 
 export const SESSION_KEY = "enable-ai-home-session";
@@ -11,6 +12,9 @@ export type HomeSession = {
   result: EnablementResponse | null;
   selectedRecommendationId?: string | null;
   submittedRecommendationId?: string | null;
+  customRecommendationTitle?: string;
+  customRecommendationBody?: string;
+  submittedCustomRecommendation?: HandoffRecommendation | null;
   enablementJobId?: string | null;
   enablementStartedAt?: number | null;
   buildJobId?: string | null;
