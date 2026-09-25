@@ -20,6 +20,11 @@ calls the Anthropic Python SDK directly rather than going through
 The CLI path (`python -m coordinator "..."`) and the Phase 7 live tests
 still use claude-agent-sdk. This module is scoped to ui/api/.
 
+Claude Opus 5.5 rejects forced tool use (tool_choice type "tool" or
+"any"). For that model this module sends tool_choice auto, strict tool
+use, and an effort setting. Models that still allow a forced call
+(including a Sonnet override) keep tool_choice type "tool".
+
 Inputs: the user's tool selection + the local catalog data.
 Output:  a fully-validated EnablementPlan, same Pydantic shape as the
          routed Coordinator path produces.
@@ -31,6 +36,7 @@ import hashlib
 import json
 import logging
 import os
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -53,7 +59,54 @@ _REPO_ROOT: Path = Path(__file__).resolve().parents[2]
 #: ENABLEMENT_AGENT_MODEL for this module only. Unset, the live plan uses
 #: the shared planner model (Opus 5.5, or ENABLEMENT_AGENT_MODEL).
 _UI_LIVE_MODEL_ENV = "UI_LIVE_MODEL"
+_SUBMIT_TOOL_NAME = "submit_enablement_plan"
+
+#: Ceiling for models that do not spend output tokens on adaptive thinking.
 _MAX_TOKENS = 4096
+
+#: Opus 5.5 always thinks, and ``max_tokens`` covers thinking plus the
+#: tool-call JSON. 4096 fit a plan when the model ran without thinking;
+#: 16k leaves room for high-effort reasoning and a full EnablementPlan.
+#: A truncated first reply retries once at 32k.
+_OPUS_55_MAX_TOKENS = 16384
+_OPUS_55_RETRY_MAX_TOKENS = 32768
+
+#: Opus 5.5's default effort is medium. The live plan is the user-visible
+#: deliverable, so we ask for high: more thinking than the default, short
+#: of the xhigh/max budgets whose docs start ``max_tokens`` at 64k.
+_OPUS_55_EFFORT = "high"
+
+#: Strict tool use returns HTTP 400 above these caps.
+_STRICT_MAX_OPTIONAL_PARAMS = 24
+_STRICT_MAX_UNION_PARAMS = 16
+_STRICT_STRING_FORMATS = frozenset(
+    {
+        "date-time",
+        "time",
+        "date",
+        "duration",
+        "email",
+        "hostname",
+        "uri",
+        "ipv4",
+        "ipv6",
+        "uuid",
+    }
+)
+_STRICT_UNSUPPORTED_KEYS = frozenset(
+    {
+        "minimum",
+        "maximum",
+        "exclusiveMinimum",
+        "exclusiveMaximum",
+        "multipleOf",
+        "minLength",
+        "maxLength",
+        "maxItems",
+        "uniqueItems",
+        "pattern",
+    }
+)
 
 
 def resolve_live_plan_model() -> str:
@@ -66,6 +119,153 @@ def resolve_live_plan_model() -> str:
     if ui_override:
         return ui_override
     return resolve_role_agent_model()
+
+
+def _model_rejects_forced_tool_choice(model: str) -> bool:
+    """True for Claude Opus 5.5, which rejects forced ``tool_choice``.
+
+    Matches the fixed id ``claude-opus-5-5`` and provider-prefixed forms
+    such as ``anthropic.claude-opus-5-5``. Opus 5 (``claude-opus-5``) and
+    earlier Opus, Sonnet, and Haiku ids still allow ``type: tool``.
+    """
+    normalized = model.strip().lower()
+    marker = "claude-opus-5-5"
+    start = normalized.find(marker)
+    if start < 0:
+        return False
+    end = start + len(marker)
+    # ``claude-opus-5-50`` contains the marker as a prefix of a longer number.
+    if end < len(normalized) and normalized[end].isdigit():
+        return False
+    return True
+
+
+def _is_union_schema(prop: Any) -> bool:
+    """True when a property schema is an anyOf/oneOf or a type array."""
+    if not isinstance(prop, dict):
+        return False
+    if "anyOf" in prop or "oneOf" in prop:
+        return True
+    type_value = prop.get("type")
+    return isinstance(type_value, list) and len(type_value) > 1
+
+
+def _schema_allows_strict_tool(schema: dict[str, Any]) -> bool:
+    """True when Anthropic strict tool use can accept this JSON Schema.
+
+    Every object must set ``additionalProperties: false``. Unsupported
+    constraints, external ``$ref``s, and the optional/union caps (24 and
+    16) also make ``strict: true`` return HTTP 400.
+    """
+    optional = 0
+    unions = 0
+    problems: list[str] = []
+
+    def walk(node: Any) -> None:
+        nonlocal optional, unions
+        if isinstance(node, list):
+            for item in node:
+                walk(item)
+            return
+        if not isinstance(node, dict):
+            return
+
+        ref = node.get("$ref")
+        if isinstance(ref, str) and not ref.startswith("#/"):
+            problems.append("external $ref")
+
+        fmt = node.get("format")
+        if isinstance(fmt, str) and fmt not in _STRICT_STRING_FORMATS:
+            problems.append(f"format {fmt}")
+
+        if "minItems" in node and node["minItems"] not in (0, 1):
+            problems.append("minItems")
+
+        for key in _STRICT_UNSUPPORTED_KEYS:
+            if key in node:
+                problems.append(key)
+
+        is_object = node.get("type") == "object" or "properties" in node
+        if is_object and node.get("additionalProperties") is not False:
+            problems.append("additionalProperties")
+
+        properties = node.get("properties")
+        if isinstance(properties, dict):
+            required = set(node.get("required") or [])
+            for name, prop in properties.items():
+                if name not in required:
+                    optional += 1
+                if _is_union_schema(prop):
+                    unions += 1
+
+        for key, value in node.items():
+            if key == "additionalProperties" and not isinstance(value, dict):
+                continue
+            walk(value)
+
+    walk(schema)
+    if optional > _STRICT_MAX_OPTIONAL_PARAMS:
+        problems.append(f"optional parameters {optional}")
+    if unions > _STRICT_MAX_UNION_PARAMS:
+        problems.append(f"union parameters {unions}")
+    if problems:
+        logger.warning(
+            "live runner: strict tool use disabled (%s)",
+            ", ".join(dict.fromkeys(problems)),
+        )
+        return False
+    return True
+
+
+@dataclass(frozen=True)
+class _LivePlanRequestShape:
+    """Messages API tool settings for one resolved planner model."""
+
+    tool_choice: dict[str, str]
+    strict: bool
+    max_tokens: int
+    output_config: dict[str, str] | None
+
+
+def _live_plan_request_shape(
+    model: str, plan_schema: dict[str, Any]
+) -> _LivePlanRequestShape:
+    """Pick tool_choice, strictness, effort, and max_tokens for ``model``.
+
+    Opus 5.5 uses automatic tool choice (forced tool use is a 400) and
+    strict tool use when the schema allows it. Other models keep a forced
+    ``submit_enablement_plan`` call and omit effort, thinking, and sampling
+    overrides.
+    """
+    if _model_rejects_forced_tool_choice(model):
+        return _LivePlanRequestShape(
+            tool_choice={"type": "auto"},
+            strict=_schema_allows_strict_tool(plan_schema),
+            max_tokens=_OPUS_55_MAX_TOKENS,
+            output_config={"effort": _OPUS_55_EFFORT},
+        )
+    return _LivePlanRequestShape(
+        tool_choice={"type": "tool", "name": _SUBMIT_TOOL_NAME},
+        strict=False,
+        max_tokens=_MAX_TOKENS,
+        output_config=None,
+    )
+
+
+def _assistant_content_for_retry(content: list[Any]) -> list[Any]:
+    """Echo assistant blocks unchanged, including empty thinking signatures.
+
+    Opus 5.5 rejects a follow-up turn that drops, edits, or reorders
+    thinking blocks. ``exclude_none`` keeps an empty ``thinking`` string.
+    """
+    echoed: list[Any] = []
+    for block in content:
+        dump = getattr(block, "model_dump", None)
+        if dump is None:
+            echoed.append(block)
+            continue
+        echoed.append(dump(mode="json", exclude_none=True))
+    return echoed
 
 
 def _gather_catalog_context(tools: list[str], user: UserContext) -> str:
@@ -117,7 +317,7 @@ def _build_user_message(
     return f"""\
 You are the {role.display_name} Enablement Agent for Enable AI.
 
-Your task: produce a structured EnablementPlan for the tools listed below, for a person whose job is {role_lower}. Call `submit_enablement_plan` exactly once when your work is complete.
+Your task: produce a structured EnablementPlan for the tools listed below, for a person whose job is {role_lower}. Call `submit_enablement_plan` exactly once when your work is complete. That call is required even when tool choice is automatic — a text-only reply cannot be turned into a plan.
 
 ## Selected tool ids
 
@@ -180,7 +380,7 @@ Populate `orchestrator_pr_plan` describing the orchestrator that would be genera
 
 ## When you call the tool
 
-Call `submit_enablement_plan` exactly once. The tool's input schema IS the EnablementPlan schema — put `department`, `summary`, `capability_coverage`, `recommendations`, `orchestrator_pr_plan`, and `metadata` **at the top level of the tool input**. Do NOT wrap them in a `plan`, `enablement_plan`, `result`, or `data` envelope. Every required field of EnablementPlan must be present and correctly typed. Enum values must match exactly. No extra fields.
+Call `submit_enablement_plan` exactly once when the plan is ready. Do not stop after reasoning in text. The tool's input schema IS the EnablementPlan schema — put `department`, `summary`, `capability_coverage`, `recommendations`, `orchestrator_pr_plan`, and `metadata` **at the top level of the tool input**. Do NOT wrap them in a `plan`, `enablement_plan`, `result`, or `data` envelope. Every required field of EnablementPlan must be present and correctly typed. Enum values must match exactly. No extra fields.
 """
 
 
@@ -196,7 +396,7 @@ You are the {role.display_name} Enablement Agent for Enable AI.
 
 Your job: reason over the tools the user selected and produce a structured EnablementPlan for a {role.display_name.lower()} teammate using those tools.
 
-You output the plan by calling the `submit_enablement_plan` tool exactly once. You do not produce free-text reports. You do not call external APIs. You do not invent tools the user didn't include.
+You output the plan by calling the `submit_enablement_plan` tool exactly once when the plan is ready. That call is required even if tool choice is left on automatic — a prose-only reply is a failed run. You do not produce free-text reports. You do not call external APIs. You do not invent tools the user didn't include.
 
 Selected tools override the role playbook. Domain knowledge below is background for the job, not a checklist of findings. Do not emit a theme from that background unless the selected tools' catalog entries are about that work. Do not reuse an earlier plan's themes when the tool list changed. If the tools look unrelated, invent one coherent cross-tool workflow from their catalog capabilities.
 
@@ -265,12 +465,32 @@ def _coerce_recommendation_kinds(args: dict[str, Any]) -> dict[str, Any]:
 def _extract_submit_args(tool_use_blocks: list[ToolUseBlock]) -> dict[str, Any]:
     """Find the submit_enablement_plan tool_use call and return its arguments."""
     for block in tool_use_blocks:
-        if block.name == "submit_enablement_plan":
+        if block.name == _SUBMIT_TOOL_NAME:
             args = block.input
             if isinstance(args, dict):
                 return _unwrap_envelope(args)
     raise RuntimeError(
         "Model did not call submit_enablement_plan. Cannot construct a plan."
+    )
+
+
+def _no_tool_use_error(response: Any) -> RuntimeError:
+    """Build the existing no-tool_use error from text blocks, not content[0].
+
+    Opus 5.5 responses can begin with thinking blocks. Selecting by ``type``
+    keeps the preview on the text the model actually wrote.
+    """
+    text_blocks = [
+        block for block in response.content if getattr(block, "type", None) == "text"
+    ]
+    debug = (
+        text_blocks[0].text[:300]  # type: ignore[union-attr]
+        if text_blocks
+        else "(no text or tool_use blocks)"
+    )
+    return RuntimeError(
+        f"Live runner: model returned no tool_use. "
+        f"stop_reason={response.stop_reason}. preview: {debug}"
     )
 
 
@@ -305,55 +525,102 @@ async def run_live_plan(
     system_prompt = _build_system_prompt(role)
     user_message = _build_user_message(tools, session_id, role, user)
 
-    # The tool's input_schema is literally the EnablementPlan JSON Schema —
-    # so the model's tool_use call is guaranteed to produce well-shaped data
-    # (Anthropic validates against this server-side).
+    # The tool's input_schema is the EnablementPlan JSON Schema. Opus 5.5
+    # marks the tool strict when that schema meets Anthropic's subset, so
+    # the API constrains the call. Other models still go through Pydantic
+    # after the forced tool_use.
     plan_schema = EnablementPlan.model_json_schema()
 
     client = AsyncAnthropic()
     model = resolve_live_plan_model()
+    shape = _live_plan_request_shape(model, plan_schema)
     logger.info(
-        "live runner: model=%s role=%s tools=%s session=%s",
+        "live runner: model=%s tool_choice=%s strict=%s max_tokens=%s role=%s tools=%s session=%s",
         model,
+        shape.tool_choice.get("type"),
+        shape.strict,
+        shape.max_tokens,
         role.id,
         tools,
         session_id,
     )
 
-    response = await client.messages.create(
-        model=model,
-        max_tokens=_MAX_TOKENS,
-        system=system_prompt,
-        tools=[
-            {
-                "name": "submit_enablement_plan",
-                "description": (
-                    "Submit the final structured EnablementPlan. Call this "
-                    "exactly once when your reasoning is complete. The input "
-                    "must conform to the EnablementPlan schema."
-                ),
-                "input_schema": plan_schema,
-            }
-        ],
-        tool_choice={"type": "tool", "name": "submit_enablement_plan"},
-        messages=[{"role": "user", "content": user_message}],
-    )
+    tool_def: dict[str, Any] = {
+        "name": _SUBMIT_TOOL_NAME,
+        "description": (
+            "Submit the final structured EnablementPlan. Call this "
+            "exactly once when your reasoning is complete. The input "
+            "must conform to the EnablementPlan schema."
+        ),
+        "input_schema": plan_schema,
+    }
+    # Strict is omitted unless the schema passed the Opus 5.5 checks.
+    # Sampling parameters and ``thinking`` are never set: Opus 5.5 rejects
+    # non-default temperature/top_p/top_k and ``thinking: disabled``.
+    if shape.strict:
+        tool_def["strict"] = True
 
-    tool_uses = [block for block in response.content if isinstance(block, ToolUseBlock)]
-    if not tool_uses:
-        # The model didn't call the tool — surface useful debugging info.
-        text_blocks = [
-            block for block in response.content if getattr(block, "type", None) == "text"
+    messages: list[dict[str, Any]] = [{"role": "user", "content": user_message}]
+    create_kwargs: dict[str, Any] = {
+        "model": model,
+        "max_tokens": shape.max_tokens,
+        "system": system_prompt,
+        "tools": [tool_def],
+        "tool_choice": shape.tool_choice,
+    }
+    if shape.output_config is not None:
+        create_kwargs["output_config"] = shape.output_config
+
+    # Automatic tool choice does not guarantee a call. One follow-up echoes
+    # the assistant turn unchanged (thinking blocks included) and asks again.
+    # Forced tool choice already requires the call, so it does not retry.
+    attempts = 2 if shape.tool_choice.get("type") == "auto" else 1
+    response: Any = None
+    tool_uses: list[ToolUseBlock] = []
+    for attempt in range(attempts):
+        response = await client.messages.create(
+            **create_kwargs,
+            messages=list(messages),
+        )
+        tool_uses = [
+            block for block in response.content if isinstance(block, ToolUseBlock)
         ]
-        debug = (
-            text_blocks[0].text[:300]  # type: ignore[union-attr]
-            if text_blocks
-            else "(no text or tool_use blocks)"
+        if tool_uses or attempt + 1 >= attempts:
+            break
+        logger.warning(
+            "live runner: no tool_use (stop_reason=%s); retrying once",
+            getattr(response, "stop_reason", None),
         )
-        raise RuntimeError(
-            f"Live runner: model returned no tool_use. "
-            f"stop_reason={response.stop_reason}. preview: {debug}"
+        if getattr(response, "stop_reason", None) == "max_tokens":
+            create_kwargs["max_tokens"] = max(
+                int(create_kwargs["max_tokens"]),
+                _OPUS_55_RETRY_MAX_TOKENS,
+            )
+        messages.append(
+            {
+                "role": "assistant",
+                "content": _assistant_content_for_retry(list(response.content)),
+            }
         )
+        messages.append(
+            {
+                "role": "user",
+                "content": (
+                    "You did not call submit_enablement_plan. Call it exactly "
+                    "once now. Put department, summary, capability_coverage, "
+                    "recommendations, orchestrator_pr_plan, and metadata at "
+                    "the top level of the tool input."
+                ),
+            }
+        )
+
+    if not tool_uses:
+        if response is None:
+            raise RuntimeError(
+                "Live runner: model returned no tool_use. "
+                "stop_reason=None. preview: (no text or tool_use blocks)"
+            )
+        raise _no_tool_use_error(response)
 
     args = _coerce_recommendation_kinds(_extract_submit_args(tool_uses))
     try:
