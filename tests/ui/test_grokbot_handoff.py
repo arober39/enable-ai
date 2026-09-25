@@ -40,8 +40,6 @@ def _isolate(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 
 def _assignment() -> str:
     return assignment_text(
-        recommendation_id="R-003",
-        kind="orchestrate",
         description="Turn Discord messages into content ideas.",
         notes="Use the community themes.",
         role_name="Developer Relations",

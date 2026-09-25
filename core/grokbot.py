@@ -59,9 +59,7 @@ class GrokbotHandoff(BaseModel):
     name: str = Field(description="Bot name to paste, or the existing bot Jev named.")
     title: str = Field(description="Suggested title. Usually the role name.")
     description: str = Field(
-        description=(
-            "Jev's placement, then the assignment. Enable AI does not call the tools named in it."
-        ),
+        description="Jev's placement, then the assignment to paste into Grok Bot.",
     )
     placement: str = Field(description="Plain sentence about where Jev says this work belongs.")
     action: PlacementAction = Field(
@@ -117,22 +115,21 @@ def _file_env() -> dict[str, str]:
 
 def assignment_text(
     *,
-    recommendation_id: str,
-    kind: str,
     description: str,
     notes: str | None,
     role_name: str,
     tools: list[str],
 ) -> str:
-    """The bot's job. Enable AI does not call the tools named here."""
+    """The bot's job to paste into Grok Bot.
+
+    Recommendation ids and instructions about Enable AI stay in the
+    surrounding handoff screen, not in this string.
+    """
     text = description.strip()
     extra = (notes or "").strip()
     tool_list = ", ".join(tools) if tools else "the tools named in the task"
-    rec_id = recommendation_id or "recommendation"
-    kind_label = kind or "recommendation"
     parts = [
-        f"You are the {role_name} bot for Enable AI recommendation {rec_id} ({kind_label}).",
-        "Do this work yourself in Grok Bot. Enable AI does not call these tools.",
+        f"You are the {role_name} bot.",
         f"Tools you should use: {tool_list}",
         text,
     ]
@@ -144,8 +141,8 @@ def assignment_text(
 def _bot_name(role_name: str) -> str:
     """Role title the user pastes as the Grok Bot name.
 
-    The recommendation id stays in the assignment body. Remembered roster
-    rows use this same role title.
+    Remembered roster rows use this same role title. The recommendation
+    id is not part of the pasted assignment.
     """
     return role_name.strip()[:_NAME_LIMIT] or "Enable AI"
 
@@ -220,8 +217,6 @@ def build_handoff(
     suggested = _bot_name(role_name)
     title = _bot_title(role_name)
     body = assignment_text(
-        recommendation_id=recommendation_id,
-        kind=kind,
         description=description,
         notes=notes,
         role_name=role_name,
@@ -551,8 +546,6 @@ def _assignment(
 ) -> str:
     notes = recommendation.get("notes")
     return assignment_text(
-        recommendation_id=str(recommendation.get("id") or ""),
-        kind=str(recommendation.get("kind") or ""),
         description=str(recommendation.get("description") or ""),
         notes=str(notes) if notes is not None else None,
         role_name=role_name,

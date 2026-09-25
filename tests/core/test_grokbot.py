@@ -95,8 +95,6 @@ def _sample_handoff(**overrides: object) -> GrokbotHandoff:
 
 def _body() -> str:
     return assignment_text(
-        recommendation_id="R-003",
-        kind="orchestrate",
         description="Turn Discord messages into content ideas.",
         notes="Use the community themes.",
         role_name="Developer Relations",
@@ -108,8 +106,11 @@ def test_handoff_text_assigns_the_work_and_lists_the_tools() -> None:
     handoff = _sample_handoff()
     parsed = GrokbotHandoff.model_validate(handoff.model_dump())
     assert parsed.description.endswith(_body())
-    assert "Enable AI does not call these tools" in parsed.description
-    assert "discord, google_docs" in parsed.description
+    assert "You are the Developer Relations bot." in parsed.description
+    assert "for Enable AI recommendation" not in parsed.description
+    assert "Do this work yourself in Grok Bot" not in parsed.description
+    assert "Enable AI does not call these tools" not in parsed.description
+    assert "Tools you should use: discord, google_docs" in parsed.description
     assert "Use the community themes." in parsed.description
     assert parsed.name == "Developer Relations"
     assert parsed.title == "Developer Relations"
@@ -830,14 +831,15 @@ def test_jev_creates_a_bot_that_owns_the_tools(monkeypatch: pytest.MonkeyPatch) 
     assert create["name"] == "Developer Relations"
     assert create["title"] == "Developer Relations"
     assert create["description"] == assignment_text(
-        recommendation_id="R-003",
-        kind="orchestrate",
         description="Turn Discord messages into content ideas.",
         notes="Use the community themes.",
         role_name="Developer Relations",
         tools=["discord", "google_docs"],
     )
-    assert "Enable AI does not call these tools" in create["description"]
+    assert "You are the Developer Relations bot." in create["description"]
+    assert "for Enable AI recommendation" not in create["description"]
+    assert "Do this work yourself in Grok Bot" not in create["description"]
+    assert "Enable AI does not call these tools" not in create["description"]
     assert "discord, google_docs" in create["description"]
 
 
