@@ -63,6 +63,9 @@ export default function Home() {
   const [selectedRecommendationId, setSelectedRecommendationId] = useState<
     string | null
   >(null);
+  const [draftRecommendationId, setDraftRecommendationId] = useState<
+    string | null
+  >(null);
 
   const handleBuilt = (kind: ArtifactKind | null) => {
     setLastArtifactKind(kind);
@@ -195,6 +198,7 @@ export default function Home() {
     setLastArtifactKind(null);
     setBuildVersion(0);
     setSelectedRecommendationId(null);
+    setDraftRecommendationId(null);
   };
 
   const onRoleChange = (roleId: string) => {
@@ -259,6 +263,7 @@ export default function Home() {
     setResult(null);
     setKeysReady(false);
     setSelectedRecommendationId(null);
+    setDraftRecommendationId(null);
     try {
       const resp = await runEnablement(
         Array.from(selected),
@@ -401,9 +406,28 @@ export default function Home() {
 
       {result && !loading && selectedRole && keysReady && (
         <section>
-          <h2 className="mb-3 text-base font-semibold">
-            6. Pick one recommendation and build
-          </h2>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-base font-semibold">
+              5. Pick one recommendation
+            </h2>
+            <button
+              type="button"
+              onClick={() => {
+                if (draftRecommendationId) {
+                  setSelectedRecommendationId(draftRecommendationId);
+                }
+              }}
+              disabled={!draftRecommendationId}
+              className={
+                "rounded-md px-4 py-2 text-sm font-semibold text-white " +
+                (draftRecommendationId
+                  ? "bg-accent hover:bg-accent/90"
+                  : "cursor-not-allowed bg-neutral-400")
+              }
+            >
+              Submit
+            </button>
+          </div>
           <p className="mb-3 text-sm text-neutral-700">
             Orchestrate and augment recommendations install a{" "}
             <code className="rounded bg-neutral-100 px-1 py-0.5 font-mono text-xs">
@@ -411,23 +435,45 @@ export default function Home() {
             </code>{" "}
             the interpreter runs. Native-AI recommendations become a setup
             guide. Consolidations become a migration plan. Other
-            recommendations can be parked for later.
+            recommendations can be parked for later. Submit sends the
+            selected recommendation to the handoff.
           </p>
           <BuildOrchestrator
             plan={result.plan}
             roleId={selectedRole}
             selectedTools={Array.from(selected)}
             selectedRecommendationId={selectedRecommendationId}
-            onSelectRecommendation={setSelectedRecommendationId}
+            onDraftChange={setDraftRecommendationId}
             onSaved={refreshSaved}
             onBuilt={handleBuilt}
           />
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => {
+                if (draftRecommendationId) {
+                  setSelectedRecommendationId(draftRecommendationId);
+                }
+              }}
+              disabled={!draftRecommendationId}
+              className={
+                "rounded-md px-4 py-2 text-sm font-semibold text-white " +
+                (draftRecommendationId
+                  ? "bg-accent hover:bg-accent/90"
+                  : "cursor-not-allowed bg-neutral-400")
+              }
+            >
+              Submit
+            </button>
+          </div>
         </section>
       )}
 
       {result && !loading && selectedRole && keysReady && pickedRecommendation && (
         <section>
-          <h2 className="mb-3 text-base font-semibold">7. Hand this to Grokbot</h2>
+          <h2 className="mb-3 text-base font-semibold">
+            6. Hand {pickedRecommendation.id} to Grokbot
+          </h2>
           <GrokbotHandoff
             recommendation={pickedRecommendation}
             roleName={roleName}
@@ -439,7 +485,7 @@ export default function Home() {
 
       {result && !loading && lastArtifactKind === "workflow" && (
         <section>
-          <h2 className="mb-3 text-base font-semibold">8. Send an inquiry</h2>
+          <h2 className="mb-3 text-base font-semibold">7. Send an inquiry</h2>
           <p className="mb-3 text-xs text-neutral-500">
             Shown only because the most recent build produced a runtime
             workflow. If you build a setup guide or migration plan next,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { buildWorkflow, saveRecommendation } from "../lib/api";
 import type {
   BuildResult,
@@ -49,7 +49,7 @@ interface Props {
   selectedTools: string[];
   onSaved: () => void;
   selectedRecommendationId: string | null;
-  onSelectRecommendation: (id: string) => void;
+  onDraftChange?: (id: string | null) => void;
   /**
    * Called after every build attempt (success or failure) with the
    * artifact_kind of the result, or `null` on failure. The page uses
@@ -68,7 +68,7 @@ export default function BuildOrchestrator({
   onSaved,
   onBuilt,
   selectedRecommendationId,
-  onSelectRecommendation,
+  onDraftChange,
 }: Props) {
   const recs = plan.recommendations;
   const [draftId, setDraftId] = useState<string | null>(
@@ -87,10 +87,10 @@ export default function BuildOrchestrator({
     ? BUILD_BUTTON_LABEL[selectedRec.kind]
     : "Build";
   const kindSubhead = selectedRec ? KIND_SUBHEAD[selectedRec.kind] : null;
-  const submitted =
-    selectedRecommendationId !== null &&
-    recs.some((rec) => rec.id === selectedRecommendationId) &&
-    selectedRecId === selectedRecommendationId;
+
+  useEffect(() => {
+    onDraftChange?.(selectedRecId);
+  }, [onDraftChange, selectedRecId]);
 
   const onBuild = async () => {
     if (!selectedRecId) return;
@@ -245,25 +245,7 @@ export default function BuildOrchestrator({
         {kindSubhead && (
           <p className="text-xs text-neutral-500">{kindSubhead}</p>
         )}
-        <p className="text-xs text-neutral-500">
-          Submit to use this recommendation in the handoff.
-        </p>
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => {
-              if (selectedRecId) onSelectRecommendation(selectedRecId);
-            }}
-            disabled={!selectedRecId || submitted || building}
-            className={
-              "inline-flex items-center gap-2 rounded-md px-4 py-2 font-semibold text-white transition " +
-              (!selectedRecId || submitted || building
-                ? "bg-neutral-400 cursor-not-allowed"
-                : "bg-accent hover:bg-accent/90")
-            }
-          >
-            {submitted ? "Submitted" : "Submit"}
-          </button>
           <button
             type="button"
             onClick={onBuild}
