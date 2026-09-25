@@ -333,6 +333,7 @@ export type GrokbotHandoffText = {
   placement: string;
   action: "create" | "update" | "create_fallback";
   existing_bot_name: string | null;
+  used_remembered_roster: boolean;
 };
 
 export function fetchGrokbotHandoff(args: {
@@ -341,6 +342,7 @@ export function fetchGrokbotHandoff(args: {
   description: string;
   notes: string | null;
   role_name: string;
+  role_id?: string | null;
   tools: string[];
 }): Promise<GrokbotHandoffText> {
   return fetchJson<GrokbotHandoffText>("/api/grokbot/handoff", {

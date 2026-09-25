@@ -3,14 +3,17 @@
 Step 7 asks Jev whether the recommendation is a new bot or belongs on an
 existing one, then shows text the user pastes into Grok Bot. It never calls
 createAgent or updateAgent. listAgents runs only when gateway credentials
-are present, and only to name an existing bot. `apply_recommendation` remains
-for a later path that would write the bot itself.
+are present. Bots named by earlier handoffs are remembered under
+`agent-state/<user_id>/grokbot_roster.json` and sent to Jev even when the
+gateway is unset. `apply_recommendation` remains for a later path that
+would write the bot itself.
 """
 
 from __future__ import annotations
 
 import logging
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlparse
@@ -20,7 +23,17 @@ from dotenv import dotenv_values
 from pydantic import BaseModel, ConfigDict, Field
 
 from core.credentials import Credentials
+from core.grokbot_roster import (
+    RememberedBot,
+    load_remembered_bots,
+    local_bot_id,
+    normalized_bot_name,
+    remember_bot,
+)
+from core.identity import UserContext, local_user
 from core.jev import CHOICE_FLOOR, JEV_CRED, decide
+from core.role_catalog import normalize_role_id
+from core.roles import list_roles
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +44,7 @@ _EXISTING = "existing_bot"
 _NAME_LIMIT = 80
 _TITLE_LIMIT = 80
 _DESCRIPTION_LIMIT = 4000
+_MEMORY_SNIPPET = 500
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
 PlacementAction = Literal["create", "update", "create_fallback"]
@@ -58,6 +72,10 @@ class GrokbotHandoff(BaseModel):
     existing_bot_name: str | None = Field(
         default=None,
         description="Name of the existing bot Jev chose, when the roster included it.",
+    )
+    used_remembered_roster: bool = Field(
+        default=False,
+        description="True when placement saw bots remembered from earlier handoffs.",
     )
 
 
@@ -174,12 +192,17 @@ def build_handoff(
     role_name: str,
     tools: list[str],
     creds: Credentials | None = None,
+    user: UserContext | None = None,
+    role_id: str | None = None,
 ) -> GrokbotHandoff:
     """Name, title, and assignment for the user to paste into Grok Bot.
 
-    Asks Jev where the work belongs. May call listAgents when gateway
-    credentials exist. Does not call createAgent or updateAgent.
+    Asks Jev where the work belongs. Reads remembered handoffs, and may
+    call listAgents when gateway credentials exist. Does not call
+    createAgent or updateAgent. A successful handoff updates the
+    remembered roster.
     """
+    owner = user if user is not None else local_user()
     suggested = _bot_name(recommendation_id, role_name)
     title = _bot_title(role_name)
     body = assignment_text(
@@ -190,7 +213,7 @@ def build_handoff(
         role_name=role_name,
         tools=tools,
     )
-    roster = _roster(creds)
+    roster, used_memory = _roster(creds, owner)
     decision = _placement(
         {
             "id": recommendation_id,
@@ -208,14 +231,27 @@ def build_handoff(
         title,
         roster,
     )
-    return GrokbotHandoff(
+    handoff = GrokbotHandoff(
         name=name,
         title=shown_title,
         description=f"{placement}\n\n{body}",
         placement=placement,
         action=action,
         existing_bot_name=existing_name,
+        used_remembered_roster=used_memory,
     )
+    _remember_handoff(
+        owner,
+        recommendation_id=recommendation_id,
+        role_name=role_name,
+        role_id=role_id,
+        action=action,
+        name=name,
+        title=shown_title,
+        assignment=body,
+        existing_name=existing_name,
+    )
+    return handoff
 
 
 def _client() -> httpx.Client:
@@ -295,8 +331,8 @@ def _bot_view(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _roster(creds: Credentials | None) -> list[dict[str, Any]] | None:
-    """Existing bots, or None when the gateway cannot be read.
+def _gateway_roster(creds: Credentials | None) -> list[dict[str, Any]] | None:
+    """Bots from listAgents, or None when the gateway cannot be read.
 
     Read-only. A missing gateway or a failed listAgents does not invent bots.
     """
@@ -310,6 +346,121 @@ def _roster(creds: Credentials | None) -> list[dict[str, Any]] | None:
         logger.info("grokbot listAgents failed: %s", exc)
         return None
     return _bots(listed if isinstance(listed, dict) else {"items": listed})
+
+
+def _merge_roster(
+    gateway: list[dict[str, Any]] | None,
+    remembered: list[RememberedBot],
+) -> list[dict[str, Any]] | None:
+    """Union gateway bots with handoff memory.
+
+    The same display name keeps the gateway id when listAgents returned
+    that bot, and fills a blank gateway title or description from memory.
+    Local-only bots stay. None means neither source had a roster.
+    """
+    if gateway is None and not remembered:
+        return None
+    # listAgents rows are an open payload. Jev reads id, name, title, description.
+    merged: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+
+    def add(row: dict[str, Any], *, gateway_wins: bool) -> None:
+        raw_name = row.get("name")
+        if not isinstance(raw_name, str) or not raw_name.strip():
+            return
+        key = normalized_bot_name(raw_name)
+        if key not in merged:
+            order.append(key)
+            merged[key] = row
+            return
+        current = merged[key]
+        if gateway_wins:
+            if not str(row.get("title") or "").strip() and current.get("title"):
+                row["title"] = current.get("title")
+            if not str(row.get("description") or "").strip() and current.get("description"):
+                row["description"] = current.get("description")
+            merged[key] = row
+            return
+        if not str(current.get("title") or "").strip() and row.get("title"):
+            current["title"] = row.get("title")
+        if not str(current.get("description") or "").strip() and row.get("description"):
+            current["description"] = row.get("description")
+
+    for bot in remembered:
+        add(
+            {
+                "id": bot.id,
+                "name": bot.name,
+                "title": bot.title,
+                "description": bot.description,
+            },
+            gateway_wins=False,
+        )
+    if gateway is not None:
+        for row in gateway:
+            add(dict(row), gateway_wins=True)
+    return [merged[key] for key in order]
+
+
+def _roster(
+    creds: Credentials | None,
+    user: UserContext,
+) -> tuple[list[dict[str, Any]] | None, bool]:
+    """Bots Jev may choose, and whether any came from handoff memory."""
+    remembered = load_remembered_bots(user)
+    return _merge_roster(_gateway_roster(creds), remembered), bool(remembered)
+
+
+def _resolved_role_id(role_name: str, role_id: str | None) -> str | None:
+    explicit = (role_id or "").strip()
+    if explicit:
+        return explicit
+    folded = role_name.strip().casefold()
+    for role in list_roles():
+        if role.display_name.casefold() == folded:
+            return role.id
+    try:
+        return normalize_role_id(role_name)
+    except ValueError:
+        return None
+
+
+def _remember_handoff(
+    user: UserContext,
+    *,
+    recommendation_id: str,
+    role_name: str,
+    role_id: str | None,
+    action: PlacementAction,
+    name: str,
+    title: str,
+    assignment: str,
+    existing_name: str | None,
+) -> None:
+    """Remember the bot this handoff told the user to create or edit.
+
+    An update that does not name a bot does not invent one.
+    """
+    if action == "update" and not existing_name:
+        return
+    bot_name = (existing_name or name).strip()
+    if not bot_name:
+        return
+    rec_id = recommendation_id.strip() or "recommendation"
+    remember_bot(
+        user,
+        RememberedBot(
+            id=local_bot_id(bot_name),
+            name=bot_name,
+            title=title,
+            description=assignment.strip()[:_MEMORY_SNIPPET],
+            role_name=role_name,
+            role_id=_resolved_role_id(role_name, role_id),
+            recommendation_id=rec_id,
+            action=action,
+            remembered_at=datetime.now(UTC),
+        ),
+    )
 
 
 def _placement(

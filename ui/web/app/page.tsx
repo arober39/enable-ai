@@ -432,6 +432,7 @@ export default function Home() {
           <GrokbotHandoff
             recommendation={pickedRecommendation}
             roleName={roleName}
+            roleId={selectedRole}
             tools={Array.from(selected)}
           />
         </section>

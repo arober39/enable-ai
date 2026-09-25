@@ -18,7 +18,7 @@ Endpoints:
   - GET    /api/outcomes                       — recent measured workflow runs for this user
   - GET    /api/outcomes/summary               — success and real-call rates per recommendation
   - POST   /api/rollback                       — uninstall the workflow for one recommendation
-  - POST   /api/grokbot/handoff               — copy-paste Grok Bot text, including Jev's placement
+  - POST   /api/grokbot/handoff               — copy-paste Grok Bot text; Jev sees remembered bots
   - POST   /api/generate-orchestrator          — (LEGACY 1.4) 4-stage codegen pipeline
   - POST   /api/run-orchestrator               — (LEGACY 1.4) run codegen-produced orchestrator
   - GET    /api/saved-recommendations          — list user's saved-for-later recs
@@ -867,6 +867,7 @@ class GrokbotHandoffRequest(BaseModel):
     description: str = Field(min_length=1)
     notes: str | None = None
     role_name: str = Field(min_length=1)
+    role_id: str | None = None
     tools: list[str] = Field(default_factory=list)
 
 
@@ -875,17 +876,21 @@ def grokbot_handoff(req: GrokbotHandoffRequest) -> GrokbotHandoff:
     """Draft paste text, including where Jev says the bot belongs.
 
     Does not call createAgent or updateAgent. listAgents runs only when
-    gateway credentials are set, and only to name an existing bot.
+    gateway credentials are set. Bots remembered from earlier handoffs
+    are included either way.
     """
-    creds = HandoffCredentials(LocalFileCredentialStore(_current_user()))
+    user = _current_user()
+    creds = HandoffCredentials(LocalFileCredentialStore(user))
     return build_handoff(
         recommendation_id=req.recommendation_id,
         kind=req.kind,
         description=req.description,
         notes=req.notes,
         role_name=req.role_name,
+        role_id=req.role_id,
         tools=req.tools,
         creds=creds,
+        user=user,
     )
 
 

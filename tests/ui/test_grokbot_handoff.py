@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from core.credentials import LocalFileCredentialStore
 from core.grokbot import GrokbotHandoff, assignment_text
+from core.grokbot_roster import load_remembered_bots
 from core.identity import local_user
 from ui.api.server import app
 
@@ -33,6 +34,7 @@ def _isolate(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         return tmp_path.joinpath(str(user_id), *parts)
 
     monkeypatch.setattr("core.credentials.state_path", _state_path)
+    monkeypatch.setattr("core.grokbot_roster.state_path", _state_path)
 
 
 def _assignment() -> str:
@@ -120,3 +122,56 @@ def test_handoff_endpoint_reads_jev_key_from_env(
     assert "Jev recommends: add this to an existing bot." in handoff.placement
     assert "Pick which bot in Grok Bot." in handoff.description
     assert handoff.action == "update"
+
+
+def test_handoff_endpoint_remembers_a_bot_and_offers_it_next_time(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _isolate(monkeypatch, tmp_path)
+
+    def _boom(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("gateway writes and listAgents are not required")
+
+    monkeypatch.setattr("core.grokbot._client", _boom)
+    client = TestClient(app)
+    first = client.post("/api/grokbot/handoff", json={**_BODY, "role_id": "devrel"})
+    assert first.status_code == 200, first.text
+    opened = GrokbotHandoff.model_validate(first.json())
+    assert opened.used_remembered_roster is False
+    assert opened.action == "create_fallback"
+    stored = load_remembered_bots(local_user())
+    assert len(stored) == 1
+    assert stored[0].name == "R-003 Developer Relations"
+    assert stored[0].role_id == "devrel"
+    assert (tmp_path / "local" / "grokbot_roster.json").is_file()
+
+    seen: dict[str, object] = {}
+
+    def _decide(state: dict, questions: object, creds: object) -> dict[str, object]:
+        seen["bots"] = state["existing_bots"]
+        return {
+            "mode": "real",
+            "reason": None,
+            "answers": {"placement": {"choice": stored[0].id, "confidence": 0.93}},
+        }
+
+    monkeypatch.setattr("core.grokbot.decide", _decide)
+    monkeypatch.setenv("JEV_API_KEY", "from-env")
+    second_body = {
+        **_BODY,
+        "recommendation_id": "R-010",
+        "description": "Draft a conference talk from Discord threads.",
+    }
+    second = client.post("/api/grokbot/handoff", json=second_body)
+    assert second.status_code == 200, second.text
+    handoff = GrokbotHandoff.model_validate(second.json())
+    assert handoff.used_remembered_roster is True
+    assert handoff.action == "update"
+    assert handoff.existing_bot_name == "R-003 Developer Relations"
+    bots = seen["bots"]
+    assert isinstance(bots, list)
+    assert bots[0]["name"] == "R-003 Developer Relations"
+    assert "GROKBOT_GATEWAY_URL" not in second.text
+    assert "SAND_GATEWAY_TOKEN" not in second.text
+    assert [bot.recommendation_id for bot in load_remembered_bots(local_user())] == ["R-010"]

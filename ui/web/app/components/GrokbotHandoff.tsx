@@ -8,6 +8,7 @@ import Spinner from "./Spinner";
 interface Props {
   recommendation: Recommendation;
   roleName: string;
+  roleId?: string | null;
   tools: string[];
 }
 
@@ -53,6 +54,7 @@ async function writeClipboard(value: string): Promise<void> {
 export default function GrokbotHandoff({
   recommendation,
   roleName,
+  roleId,
   tools,
 }: Props) {
   const [handoff, setHandoff] = useState<GrokbotHandoffText | null>(null);
@@ -72,6 +74,7 @@ export default function GrokbotHandoff({
       description: recommendation.description,
       notes: recommendation.notes,
       role_name: roleName,
+      role_id: roleId,
       tools,
     })
       .then((next) => {
@@ -97,6 +100,7 @@ export default function GrokbotHandoff({
     recommendation.description,
     recommendation.notes,
     roleName,
+    roleId,
     toolKey,
   ]);
 
@@ -156,6 +160,11 @@ export default function GrokbotHandoff({
           }
         >
           {handoff.placement}
+        </p>
+      )}
+      {handoff?.used_remembered_roster && (
+        <p className="text-xs text-neutral-500">
+          Using bots remembered from earlier handoffs.
         </p>
       )}
       <div>
