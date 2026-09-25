@@ -23,7 +23,13 @@ from pydantic import ValidationError
 
 from core.credentials import runtime_credentials
 from core.identity import UserContext
-from core.tool_catalog import ToolCapability, cache_tool, normalize_name
+from core.tool_catalog import (
+    ToolCapability,
+    cache_tool,
+    find_aliased_tool,
+    normalize_name,
+    note_alias_resolution,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +101,9 @@ async def research_tool(
 
     Args:
         name: Free-form tool name typed by the user. Normalized to a
-            canonical lowercase slug before research.
+            canonical lowercase slug before research. A short alias such as
+            ``docs`` reuses an existing ``google_docs`` card when one is
+            already in the catalog, and does not write a second cache file.
         user: Identity context — used for cache-write only.
         cache: If True, persist the validated result to the user's
             tool cache. Set False for one-off previews.
@@ -108,6 +116,16 @@ async def research_tool(
             validation fails.
         ValueError: if `name` cannot be normalized.
     """
+    canonical = normalize_name(name)
+    existing = find_aliased_tool(user, name)
+    if existing is not None:
+        logger.info(
+            "tool research: reusing %s for typed name %s",
+            existing.canonical_name,
+            name,
+        )
+        return note_alias_resolution(existing, name)
+
     creds = runtime_credentials()
     if not creds.get("ANTHROPIC_API_KEY"):
         raise RuntimeError(
@@ -115,7 +133,6 @@ async def research_tool(
             "Add it via the Settings page in the UI."
         )
 
-    canonical = normalize_name(name)
     schema = _schema_for_submit()
 
     user_message = (

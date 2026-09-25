@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { visiblePickerItems } from "../lib/pickerItems";
+import { rolesPrefixedBy } from "../lib/roleQuery";
 import type { RoleSummary } from "../lib/types";
 import Spinner from "./Spinner";
 
@@ -44,7 +45,12 @@ export default function RolePicker({
       (r) =>
         r.id.toLowerCase() === q || r.display_name.toLowerCase() === q,
     );
-  const canResearch = q.length >= _MIN_QUERY && !exactMatch && !researching;
+  const prefixOf = rolesPrefixedBy(query, roles);
+  const canResearch =
+    q.length >= _MIN_QUERY &&
+    !exactMatch &&
+    prefixOf.length === 0 &&
+    !researching;
   const shown = visiblePickerItems({
     items: roles,
     query,
@@ -119,6 +125,13 @@ export default function RolePicker({
         <div className="rounded-md border border-rose-300 bg-rose-50 p-2 text-xs text-rose-800">
           <strong>Error:</strong> {error}
         </div>
+      )}
+
+      {q.length >= _MIN_QUERY && prefixOf.length > 0 && !researching && (
+        <p className="text-xs text-neutral-500">
+          This matches {prefixOf.map((role) => role.display_name).join(", ")}.
+          Use Research on that card.
+        </p>
       )}
 
       {visible.length === 0 && !canResearch && (

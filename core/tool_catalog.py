@@ -17,8 +17,6 @@ changed since the seed YAML was written. Read-write the same shape.
 
 from __future__ import annotations
 
-import ast
-import html
 import json
 import logging
 import re
@@ -29,6 +27,24 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from core.identity import UserContext
+from core.llm_payload import (
+    UNPARSED as _UNPARSED,
+)
+from core.llm_payload import (
+    coerce_string_list as _coerce_string_list,
+)
+from core.llm_payload import (
+    extract_balanced as _extract_balanced,
+)
+from core.llm_payload import (
+    parse_structured as _parse_structured,
+)
+from core.llm_payload import (
+    strip_fence as _strip_fence,
+)
+from core.llm_payload import (
+    text_candidates as _text_candidates,
+)
 from core.state import repo_root, state_path
 
 logger = logging.getLogger(__name__)
@@ -158,97 +174,12 @@ class ToolCapability(BaseModel):
 # LLM payload normalization
 # ---------------------------------------------------------------------------
 
-# Tool-use JSON is untyped until we narrow it. `Any` stays on this boundary.
-_UNPARSED = object()
-
-_FENCE_RE = re.compile(r"^\s*```(?:json|JSON)?\s*\n?(.*?)\n?```\s*$", re.DOTALL)
-_TAG_RE = re.compile(r"<[^>]*>")
-_TOKEN_RE = re.compile(r"^[A-Za-z0-9_ ./+-]+$")
-
 
 def _log_normalization(field: str, original: object) -> None:
     if original is None:
         logger.debug("tool capability: coerced null %s to an empty list", field)
         return
     logger.warning("tool capability: normalized %s from %s", field, type(original).__name__)
-
-
-def _strip_fence(text: str) -> str:
-    stripped = text.strip()
-    match = _FENCE_RE.match(stripped)
-    if match is None:
-        return stripped
-    return match.group(1).strip()
-
-
-def _strip_markup(text: str) -> str:
-    """Drop HTML/XML tags and unescape entities around an embedded JSON value."""
-    return _TAG_RE.sub(" ", html.unescape(text)).strip()
-
-
-def _text_candidates(text: str) -> list[str]:
-    stripped = _strip_fence(text)
-    candidates = [stripped]
-    messy = _strip_markup(stripped)
-    if messy != stripped:
-        candidates.append(messy)
-    return candidates
-
-
-def _parse_structured(text: str) -> Any:
-    """Parse JSON, including one layer of double-encoding, then a Python literal.
-
-    Returns `_UNPARSED` when `text` is not a structured value. JSON `null`
-    returns None.
-    """
-    try:
-        value = json.loads(text)
-    except json.JSONDecodeError:
-        value = _UNPARSED
-    else:
-        if isinstance(value, str):
-            try:
-                return json.loads(value)
-            except json.JSONDecodeError:
-                return value
-        return value
-    stripped = text.strip()
-    if not stripped or stripped[0] not in "[{\"'":
-        return _UNPARSED
-    try:
-        return ast.literal_eval(stripped)
-    except (SyntaxError, ValueError, MemoryError):
-        return _UNPARSED
-
-
-def _extract_balanced(text: str, open_ch: str, close_ch: str) -> str | None:
-    """Return the first balanced bracket/brace slice, respecting JSON strings."""
-    start = text.find(open_ch)
-    if start < 0:
-        return None
-    depth = 0
-    in_string = False
-    escaped = False
-    for index in range(start, len(text)):
-        char = text[index]
-        if in_string:
-            if escaped:
-                escaped = False
-            elif char == "\\":
-                escaped = True
-            elif char == '"':
-                in_string = False
-            continue
-        if char == '"':
-            in_string = True
-            continue
-        if char == open_ch:
-            depth += 1
-        elif char == close_ch:
-            depth -= 1
-            if depth == 0:
-                return text[start : index + 1]
-    return None
 
 
 def _extract_json_objects(text: str) -> list[dict[str, Any]]:
@@ -269,71 +200,6 @@ def _extract_json_objects(text: str) -> list[dict[str, Any]]:
         else:
             cursor = start + 1
     return found
-
-
-def _plain_tokens(text: str) -> list[str] | None:
-    """Split a comma-separated token list. Reject prose and markup."""
-    stripped = text.strip()
-    if not stripped:
-        return None
-    parts = [part.strip() for part in stripped.split(",") if part.strip()]
-    if not parts or any(not _TOKEN_RE.fullmatch(part) for part in parts):
-        return None
-    return parts
-
-
-def _strings_from_items(items: list[Any]) -> list[str]:
-    values: list[str] = []
-    for item in items:
-        if isinstance(item, str):
-            token = item.strip()
-            if token:
-                values.append(token)
-    return values
-
-
-def _string_list_from_parsed(parsed: Any) -> list[str] | None:
-    if isinstance(parsed, list):
-        return _strings_from_items(parsed)
-    if isinstance(parsed, str):
-        token = parsed.strip()
-        return [token] if token else []
-    return None
-
-
-def _recover_string_list(text: str) -> list[str]:
-    for candidate in _text_candidates(text):
-        parsed = _parse_structured(candidate)
-        if parsed is not _UNPARSED:
-            as_list = _string_list_from_parsed(parsed)
-            if as_list is not None:
-                return as_list
-        array_text = _extract_balanced(candidate, "[", "]")
-        if array_text is None or array_text == candidate:
-            continue
-        parsed_array = _parse_structured(array_text)
-        if parsed_array is _UNPARSED:
-            continue
-        as_list = _string_list_from_parsed(parsed_array)
-        if as_list is not None:
-            return as_list
-    for candidate in _text_candidates(text):
-        tokens = _plain_tokens(candidate)
-        if tokens is not None:
-            return tokens
-    return []
-
-
-def _coerce_string_list(value: Any) -> Any:
-    if value is None:
-        return []
-    if isinstance(value, list):
-        return value
-    if isinstance(value, str):
-        if not value.strip():
-            return []
-        return _recover_string_list(value)
-    return value
 
 
 def _sanitize_feature(raw: dict[str, Any]) -> dict[str, Any] | None:
@@ -461,6 +327,10 @@ def normalize_name(raw: str) -> str:
     Lowercases, replaces spaces/dashes with underscores, strips non-allowed
     characters. Raises ValueError if the result is empty or starts with a
     digit (would fail the canonical name pattern).
+
+    This stays a pure slug. Short names that mean an existing product
+    (`docs` → `google_docs`) are resolved by `find_aliased_tool` at research
+    time, and only when that product is already in the catalog.
     """
     slug = re.sub(r"[^a-zA-Z0-9]+", "_", raw.strip()).strip("_").lower()
     if not slug or slug[0].isdigit():
@@ -468,6 +338,75 @@ def normalize_name(raw: str) -> str:
     if not _CANONICAL_NAME_RE.match(slug):
         raise ValueError(f"derived name {slug!r} fails canonical pattern")
     return slug
+
+
+# Typed names that should reuse one existing product instead of a second card.
+# `docs` is ambiguous (Google Docs vs. a documentation site); the alias applies
+# only when the target is already in the seed catalog or the user's cache.
+_PRODUCT_ALIASES: dict[str, str] = {
+    "docs": "google_docs",
+    "gdocs": "google_docs",
+    "googledocs": "google_docs",
+    "google_doc": "google_docs",
+}
+
+
+def _vendor_slug(vendor: str) -> str | None:
+    try:
+        return normalize_name(vendor)
+    except ValueError:
+        return None
+
+
+def _matches_aliased_product(typed: str, capability: ToolCapability) -> bool:
+    """True when `typed` is a short alias for this existing capability."""
+    target = _PRODUCT_ALIASES.get(typed)
+    if target is None or capability.canonical_name == typed:
+        return False
+    if capability.canonical_name == target:
+        return True
+    return _vendor_slug(capability.vendor) == target
+
+
+def find_aliased_tool(user: UserContext, raw_name: str) -> ToolCapability | None:
+    """Return an existing tool when `raw_name` aliases it.
+
+    Researching `docs` must not write `tool_cache/docs.json` when
+    `google_docs` (or another card whose vendor slug is `google_docs`) is
+    already present. When nothing matches, return None so research keeps the
+    typed slug — `docs` can still mean a documentation site.
+    """
+    typed = normalize_name(raw_name)
+    if typed not in _PRODUCT_ALIASES:
+        return None
+    matches = [
+        capability
+        for capability in list_tools(user)
+        if _matches_aliased_product(typed, capability)
+    ]
+    if not matches:
+        return None
+    target = _PRODUCT_ALIASES[typed]
+    for capability in matches:
+        if capability.canonical_name == target:
+            return capability
+    return matches[0]
+
+
+def note_alias_resolution(capability: ToolCapability, raw_name: str) -> ToolCapability:
+    """Return a copy whose notes record why the typed name reused this card.
+
+    Does not write the cache. The stored card stays as researched.
+    """
+    sentence = (
+        f"Resolved typed name {raw_name.strip()!r} to this existing tool "
+        f"({capability.canonical_name}) instead of creating a duplicate card."
+    )
+    notes = (capability.notes or "").strip()
+    if sentence in notes:
+        return capability
+    combined = f"{notes} {sentence}".strip()
+    return capability.model_copy(update={"notes": combined})
 
 
 # ---------------------------------------------------------------------------
