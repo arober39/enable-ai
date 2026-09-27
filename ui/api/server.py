@@ -1,4 +1,4 @@
-"""FastAPI backend for the Enable AI UI.
+"""FastAPI backend for the Agent Architect demo.
 
 Endpoints:
   - GET    /api/tools                          — seed catalog + user's researched tools
@@ -180,8 +180,8 @@ async def _lifespan(_app: FastAPI):
 
 
 app = FastAPI(
-    title="Enable AI — UI API",
-    description="Backend for the Next.js test UI. Hosts the Support agent.",
+    title="Agent Architect",
+    description="API for the Agent Architect demo. Compiles a supervision blueprint.",
     version="0.1.0",
     lifespan=_lifespan,
 )
@@ -790,8 +790,8 @@ class BuildWorkflowRequest(BaseModel):
     plan: EnablementPlan
     selected_recommendation_id: str = Field(min_length=1)
     tools: list[str] = Field(
-        description="The full stack the user picked when running the "
-        "Enablement Agent. The workflow may legitimately reference any of "
+        description="The full stack the user picked when running "
+        "Agent Architect. The workflow may legitimately reference any of "
         "these tools, not just the recommendation's `tools_affected`."
     )
     role: str | None = Field(
@@ -843,7 +843,7 @@ async def build_workflow_endpoint(
         raise HTTPException(
             400,
             "BuildWorkflowRequest.tools is empty — pass the stack the user "
-            "selected when running the Enablement Agent.",
+            "selected when running Agent Architect.",
         )
     capabilities: list[ToolCapability] = []
     missing: list[str] = []

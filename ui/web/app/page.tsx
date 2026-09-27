@@ -432,7 +432,7 @@ export default function Home() {
               ? current
               : null,
           );
-        } else setError(job.error ?? "Enablement run failed.");
+        } else setError(job.error ?? "Agent Architect run failed.");
       } catch (e) {
         if (cancelled) return;
         if (e instanceof ApiError && e.status === 404) {
@@ -516,12 +516,12 @@ export default function Home() {
   const roleName =
     roles.find((role) => role.id === selectedRole)?.display_name ??
     selectedRole ??
-    "Enable AI";
+    "Agent Architect";
 
   return (
     <main className="space-y-8">
       <header>
-        <h1 className="text-2xl font-bold">Enable AI — Agent Architect</h1>
+        <h1 className="text-2xl font-bold">Agent Architect</h1>
         <p className="mt-1 text-sm text-neutral-600">
           Figure out what agent to build. Start from the work you actually do,
           then design the workflows you supervise. The blueprint feeds OpenAI
@@ -603,7 +603,7 @@ export default function Home() {
 
       <section>
         <h2 className="mb-3 text-base font-semibold">
-          3. Run the Enablement Agent
+          3. Run Agent Architect
         </h2>
         <button
           type="button"

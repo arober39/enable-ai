@@ -126,9 +126,9 @@ test("enablement progress stays inside step 3", async ({ page }) => {
 
   await page.getByRole("button", { name: /Run \(demo\)/i }).click();
   const step3 = page.locator("section").filter({
-    has: page.getByRole("heading", { name: "3. Run the Enablement Agent" }),
+    has: page.getByRole("heading", { name: "3. Run Agent Architect" }),
   });
-  await expect(step3.getByText("Running Enablement Agent…")).toBeVisible();
+  await expect(step3.getByText("Running Agent Architect…")).toBeVisible();
   await expect(page.getByRole("heading", { name: "4. In progress" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "4. Plan" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "4. Agent Blueprint" })).toHaveCount(0);

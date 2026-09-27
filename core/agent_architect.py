@@ -627,7 +627,7 @@ def _architecture(vendors: list[str], assessments: list[TaskAssessment]) -> str:
         f"{agentic} bounded agent step{'s' if agentic != 1 else ''} sit under it. "
         f"{automate} step{'s' if automate != 1 else ''} stay deterministic workflows "
         "where a fixed check is the better fit. Human and assist steps stop for you. "
-        "You design what you supervise, then build it in the system you choose."
+        "Agent Architect writes the blueprint. You build it in the system you choose."
     )
 
 

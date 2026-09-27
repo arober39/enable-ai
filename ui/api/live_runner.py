@@ -315,9 +315,9 @@ def _build_user_message(
     catalog_context = _gather_catalog_context(tools, user)
     role_lower = role.display_name.lower()
     return f"""\
-You are the {role.display_name} Enablement Agent for Enable AI.
+You are Agent Architect, compiling a blueprint for a {role.display_name}.
 
-Your task: produce a structured EnablementPlan for the tools listed below, for a person whose job is {role_lower}. Call `submit_enablement_plan` exactly once when your work is complete. That call is required even when tool choice is automatic — a text-only reply cannot be turned into a plan.
+Your task: produce a structured EnablementPlan for the tools listed below, for a person whose job is {role_lower}. The plan is the blueprint's evidence: what the tools can do together, and what the person would supervise. Call `submit_enablement_plan` exactly once when your work is complete. That call is required even when tool choice is automatic — a text-only reply cannot be turned into a plan.
 
 ## Selected tool ids
 
@@ -394,7 +394,7 @@ def _build_system_prompt(role: Role) -> str:
     """
     dk = role.domain_knowledge_text()
     return f"""\
-You are the {role.display_name} Enablement Agent for Enable AI.
+You are Agent Architect. Compile a blueprint for a {role.display_name.lower()}: the work they actually do, what they should supervise, and which system should build it.
 
 Your job: reason over the tools the user selected and produce a structured EnablementPlan for a {role.display_name.lower()} teammate using those tools.
 

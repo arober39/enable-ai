@@ -137,8 +137,8 @@ export default function AgentBlueprintView({ blueprint }: Props) {
       <section>
         <h3 className="mb-1 text-base font-semibold">Build this</h3>
         <p className="mb-2 text-sm text-neutral-600">
-          This product feeds the systems below. It is the place to decide what
-          agent to build.
+          Agent Architect feeds the systems below. Use it to decide what agent
+          to build.
         </p>
         <ul className="space-y-2">
           {blueprint.build_targets.map((target) => (

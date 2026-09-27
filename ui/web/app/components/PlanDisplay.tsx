@@ -38,7 +38,7 @@ export default function PlanDisplay({ response }: Props) {
             {mode} mode
           </span>
           <span className="text-xs text-neutral-500">
-            agent: {plan.metadata.agent_name} v{plan.metadata.agent_version}
+            Agent Architect
           </span>
         </div>
         <h2 className="mb-2 text-lg font-semibold">Plan summary</h2>
