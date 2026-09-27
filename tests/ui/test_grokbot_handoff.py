@@ -9,6 +9,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from core.agent_architect import AgentBlueprint
 from core.credentials import LocalFileCredentialStore
 from core.grokbot import GrokbotHandoff, assignment_text
 from core.grokbot_roster import load_remembered_bots
@@ -24,6 +25,29 @@ _BODY = {
     "role_name": "Developer Relations",
     "tools": ["discord", "google_docs"],
 }
+
+_BLUEPRINT = AgentBlueprint.model_validate(
+    {
+        "supervision_shift": "Move from worker to supervisor.",
+        "current_workflow": "Copy community themes by hand.",
+        "pain_points": ["Repeated handoffs."],
+        "trigger": "Start on a recurring theme.",
+        "agent_responsibilities": ["Carry context from Discord into GitHub."],
+        "tools": ["discord", "github"],
+        "autonomous_actions": ["Prepare a GitHub issue."],
+        "human_in_the_loop": ["Review before publication."],
+        "architecture": "A bounded multi-tool agent with a review gate.",
+        "assessments": [],
+        "build_targets": [
+            {
+                "id": "langgraph",
+                "label": "LangGraph",
+                "recommended": True,
+                "why": "Supports explicit supervision.",
+            }
+        ],
+    }
+).model_dump(mode="json")
 
 
 def _isolate(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -72,6 +96,36 @@ def test_handoff_endpoint_missing_jev_key_still_returns_copy_text(
     assert _assignment() in handoff.description
     assert "GROKBOT_GATEWAY_URL" not in response.text
     assert "SAND_GATEWAY_TOKEN" not in response.text
+
+
+def test_handoff_endpoint_passes_the_blueprint_to_jev_and_copy_text(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _isolate(monkeypatch, tmp_path)
+    monkeypatch.setenv("JEV_API_KEY", "from-env")
+    seen: dict[str, object] = {}
+
+    def _decide(state: dict, questions: object, creds: object) -> dict[str, object]:
+        seen.update(state)
+        return {
+            "mode": "real",
+            "reason": None,
+            "answers": {"placement": {"choice": "new_bot", "confidence": 0.9}},
+        }
+
+    monkeypatch.setattr("core.grokbot.decide", _decide)
+    response = TestClient(app).post(
+        "/api/grokbot/handoff",
+        json={**_BODY, "blueprint": _BLUEPRINT},
+    )
+    assert response.status_code == 200, response.text
+    handoff = GrokbotHandoff.model_validate(response.json())
+    assert seen["agent_blueprint"] == _BLUEPRINT
+    assert "Agent Architect produced this Agent Blueprint" in handoff.description
+    assert "Architecture:\n- A bounded multi-tool agent" in handoff.description
+    assert "Build-with targets:\n- LangGraph (recommended)" in handoff.description
+    assert "Human-in-the-loop:\n- Review before publication." in handoff.description
 
 
 def test_handoff_endpoint_ignores_jev_key_in_settings(
@@ -295,13 +349,14 @@ def test_handoff_endpoint_posts_webhook_when_env_is_set(
     seen = _capture_webhook(monkeypatch, lambda _request: httpx.Response(204))
     response = TestClient(app).post(
         "/api/grokbot/handoff",
-        json={**_BODY, "role_id": "devrel"},
+        json={**_BODY, "role_id": "devrel", "blueprint": _BLUEPRINT},
     )
     assert response.status_code == 200, response.text
     handoff = GrokbotHandoff.model_validate(response.json())
     assert handoff.webhook_status == "sent"
     assert handoff.webhook_message == WEBHOOK_SENT
-    assert _assignment() in handoff.description
+    assert "Agent Architect produced this Agent Blueprint" in handoff.description
+    assert "Selected recommendation:\n- Turn Discord messages" in handoff.description
     assert "sender-key" not in response.text
     assert len(seen) == 1
     request = seen[0]
@@ -319,6 +374,8 @@ def test_handoff_endpoint_posts_webhook_when_env_is_set(
     assert posted.role_name == "Developer Relations"
     assert posted.role_id == "devrel"
     assert posted.tools == ["discord", "google_docs"]
+    assert posted.blueprint is not None
+    assert posted.blueprint.architecture == "A bounded multi-tool agent with a review gate."
     assert posted.existing_bot_name is None
 
 
