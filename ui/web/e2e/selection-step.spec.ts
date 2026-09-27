@@ -50,29 +50,39 @@ test("role and tool cards toggle from the card and from Select or Add", async ({
   const roleBox = await roleCard.boundingBox();
   if (!roleBox) throw new Error("role card has no box");
   await page.mouse.click(roleBox.x + 6, roleBox.y + 6);
-  await expect(roleCard.getByRole("button", { name: "Selected" })).toBeVisible();
+  await expect(
+    roleCard.getByRole("button", { name: "Selected", exact: true }),
+  ).toBeVisible();
+
+  await roleCard.getByRole("button", { name: "Selected", exact: true }).click();
+  await expect(
+    roleCard.getByRole("button", { name: "Select", exact: true }),
+  ).toBeVisible();
 
   await roleCard.getByRole("button", { name: "Select", exact: true }).click();
-  await expect(roleCard.getByRole("button", { name: "Select", exact: true })).toBeVisible();
-
-  await roleCard.getByRole("button", { name: "Select", exact: true }).click();
-  await expect(roleCard.getByRole("button", { name: "Selected" })).toBeVisible();
+  await expect(
+    roleCard.getByRole("button", { name: "Selected", exact: true }),
+  ).toBeVisible();
 
   const toolButton = page.getByRole("button", { name: /^Intercom/ });
   await expect(toolButton).toBeVisible();
   const toolRow = toolButton.locator("xpath=ancestor::li");
-  await toolRow.getByRole("button", { name: "Add" }).click();
-  await expect(toolRow.getByRole("button", { name: "Selected" })).toBeVisible();
+  await toolRow.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(
+    toolRow.getByRole("button", { name: "Selected", exact: true }),
+  ).toBeVisible();
   await expect(page.getByText(/1 of \d+ selected/)).toBeVisible();
 
   const toolBox = await toolRow.boundingBox();
   if (!toolBox) throw new Error("tool row has no box");
   await page.mouse.click(toolBox.x + 8, toolBox.y + 8);
-  await expect(toolRow.getByRole("button", { name: "Add" })).toBeVisible();
+  await expect(toolRow.getByRole("button", { name: "Add", exact: true })).toBeVisible();
   await expect(page.getByText(/0 of \d+ selected/)).toBeVisible();
 
   await page.mouse.click(toolBox.x + 8, toolBox.y + 8);
-  await expect(toolRow.getByRole("button", { name: "Selected" })).toBeVisible();
+  await expect(
+    toolRow.getByRole("button", { name: "Selected", exact: true }),
+  ).toBeVisible();
 });
 
 test("enablement progress stays inside step 3", async ({ page }) => {
@@ -112,4 +122,19 @@ test("enablement progress stays inside step 3", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "5. Pick one recommendation" }),
   ).toHaveCount(0);
+});
+
+test("finished plan shows relationships and a research kit", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /^Developer Relations/ }).click();
+  await page.getByRole("button", { name: /^Intercom/ }).click();
+  await page.getByRole("button", { name: /^Slack/ }).click();
+  await page.getByRole("button", { name: /Run \(demo\)/i }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "How these tools work together" }),
+  ).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("heading", { name: "4. Plan" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Research kit" }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: /6\. Hand / })).toHaveCount(0);
 });
