@@ -64,6 +64,18 @@ test("role and tool cards toggle from the card and from Select or Add", async ({
     roleCard.getByRole("button", { name: "Selected", exact: true }),
   ).toBeVisible();
 
+  await expect(page.getByText("Which of these do you actually do?")).toBeVisible();
+  const contentResearch = page.getByRole("checkbox", { name: "Content research" });
+  await contentResearch.scrollIntoViewIfNeeded();
+  await expect(contentResearch).toBeChecked();
+  const taskRow = contentResearch.locator("xpath=ancestor::li");
+  const taskBox = await taskRow.boundingBox();
+  if (!taskBox) throw new Error("task row has no box");
+  await page.mouse.click(taskBox.x + taskBox.width - 20, taskBox.y + 14);
+  await expect(contentResearch).not.toBeChecked();
+  await contentResearch.click();
+  await expect(contentResearch).toBeChecked();
+
   const toolButton = page.getByRole("button", { name: /^Intercom/ });
   await expect(toolButton).toBeVisible();
   const toolRow = toolButton.locator("xpath=ancestor::li");
@@ -119,6 +131,7 @@ test("enablement progress stays inside step 3", async ({ page }) => {
   await expect(step3.getByText("Running Enablement Agent…")).toBeVisible();
   await expect(page.getByRole("heading", { name: "4. In progress" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "4. Plan" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "4. Agent Blueprint" })).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "5. Pick one recommendation" }),
   ).toHaveCount(0);
@@ -134,7 +147,12 @@ test("finished plan shows relationships and a research kit", async ({ page }) =>
   await expect(
     page.getByRole("heading", { name: "How these tools work together" }),
   ).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole("heading", { name: "4. Plan" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "4. Agent Blueprint" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Supervision Plan" })).toBeVisible();
+  await expect(page.getByText(/Supervision potential/)).toBeVisible();
+  await expect(
+    page.getByRole("checkbox", { name: "OpenAI Agents SDK" }),
+  ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Research kit" }).first()).toBeVisible();
   await expect(page.getByRole("heading", { name: /6\. Hand / })).toHaveCount(0);
 });

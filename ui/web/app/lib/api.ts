@@ -6,8 +6,10 @@ import type {
   Recommendation,
   RoleSummary,
   SavedRecommendation,
+  TaskSelection,
   ToolSummary,
   UserPreferences,
+  WorkTask,
 } from "./types";
 
 // In dev we call the FastAPI backend directly (CORS configured server-side
@@ -106,10 +108,17 @@ export type JobView<T> = {
 export function startEnablementJob(
   tools: string[],
   role?: string,
+  tasks?: TaskSelection[],
+  friction?: string,
 ): Promise<JobView<EnablementResponse>> {
   return fetchJson<JobView<EnablementResponse>>("/api/jobs/enablement", {
     method: "POST",
-    body: JSON.stringify({ tools, ...(role ? { role } : {}) }),
+    body: JSON.stringify({
+      tools,
+      ...(role ? { role } : {}),
+      ...(tasks ? { tasks } : {}),
+      ...(friction ? { friction } : {}),
+    }),
   });
 }
 
@@ -126,11 +135,23 @@ export function cancelJob<T>(id: string): Promise<JobView<T>> {
 export function runEnablement(
   tools: string[],
   role?: string,
+  tasks?: TaskSelection[],
+  friction?: string,
 ): Promise<EnablementResponse> {
   return fetchJson<EnablementResponse>("/api/enablement", {
     method: "POST",
-    body: JSON.stringify({ tools, ...(role ? { role } : {}) }),
+    body: JSON.stringify({
+      tools,
+      ...(role ? { role } : {}),
+      ...(tasks ? { tasks } : {}),
+      ...(friction ? { friction } : {}),
+    }),
   });
+}
+
+export function listWorkTasks(role: string): Promise<WorkTask[]> {
+  const query = new URLSearchParams({ role });
+  return fetchJson<WorkTask[]>(`/api/work-tasks?${query.toString()}`);
 }
 
 export function listRoles(): Promise<RoleSummary[]> {

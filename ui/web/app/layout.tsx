@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Enable AI — test UI",
+  title: "Enable AI — Agent Architect",
   description:
-    "Pick a support stack, get an EnablementPlan from the Support Enablement Agent.",
+    "Figure out what agent to build from the work you actually do, then supervise it.",
 };
 
 export default function RootLayout({

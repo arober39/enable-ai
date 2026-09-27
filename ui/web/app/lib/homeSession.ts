@@ -1,5 +1,5 @@
 import type { HandoffRecommendation } from "./customRecommendation";
-import type { EnablementResponse } from "./types";
+import type { EnablementResponse, TaskChoice } from "./types";
 
 export const SESSION_KEY = "enable-ai-home-session";
 const PENDING_TOOLS_KEY = "enable-ai-pending-tools";
@@ -18,6 +18,9 @@ export type HomeSession = {
   enablementJobId?: string | null;
   enablementStartedAt?: number | null;
   buildJobId?: string | null;
+  selectedTaskIds?: string[];
+  customTasks?: TaskChoice[];
+  friction?: string;
 };
 
 export function writePendingKeys(keys: string[]): void {

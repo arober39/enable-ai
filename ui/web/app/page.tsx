@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import AgentBlueprintView from "./components/AgentBlueprintView";
 import BuildOrchestrator from "./components/BuildOrchestrator";
 import GrokbotHandoff from "./components/GrokbotHandoff";
 import LoadingPanel from "./components/LoadingPanel";
@@ -9,6 +10,7 @@ import RolePicker from "./components/RolePicker";
 import SavedRecommendations from "./components/SavedRecommendations";
 import Spinner from "./components/Spinner";
 import ToolPicker from "./components/ToolPicker";
+import WorkIntelligence from "./components/WorkIntelligence";
 import {
   ApiError,
   cancelJob,
@@ -19,6 +21,7 @@ import {
   listRoles,
   listSavedRecommendations,
   listTools,
+  listWorkTasks,
   researchRole,
   researchTool,
   setSelectedRole,
@@ -42,7 +45,10 @@ import type {
   EnablementResponse,
   RoleSummary,
   SavedRecommendation,
+  TaskChoice,
+  TaskSelection,
   ToolSummary,
+  WorkTask,
 } from "./lib/types";
 
 export default function Home() {
@@ -51,6 +57,12 @@ export default function Home() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [roles, setRoles] = useState<RoleSummary[]>([]);
   const [selectedRole, setSelectedRoleState] = useState<string | null>(null);
+  const [workTasks, setWorkTasks] = useState<WorkTask[]>([]);
+  const [customTasks, setCustomTasks] = useState<TaskChoice[]>([]);
+  const [checkedTaskIds, setCheckedTaskIds] = useState<Set<string>>(new Set());
+  const [tasksLoadedFor, setTasksLoadedFor] = useState<string | null>(null);
+  const [friction, setFriction] = useState("");
+  const restoredTasks = useRef<{ role: string; ids: string[] } | null>(null);
   const [savedRecs, setSavedRecs] = useState<SavedRecommendation[]>([]);
   const [result, setResult] = useState<EnablementResponse | null>(null);
   const [selectedRecommendationId, setSelectedRecommendationId] = useState<
@@ -93,6 +105,15 @@ export default function Home() {
         if (saved && sameServer) {
           setSelected(new Set(saved.selected));
           setSelectedRoleState(saved.selectedRole);
+          setFriction(saved.friction ?? "");
+          setCustomTasks(saved.customTasks ?? []);
+          if (saved.selectedRole && Array.isArray(saved.selectedTaskIds)) {
+            restoredTasks.current = {
+              role: saved.selectedRole,
+              ids: saved.selectedTaskIds,
+            };
+            setCheckedTaskIds(new Set(saved.selectedTaskIds));
+          }
           setResult(saved.result);
           setSelectedRecommendationId(saved.selectedRecommendationId ?? null);
           setSubmittedRecommendationId(saved.submittedRecommendationId ?? null);
@@ -111,6 +132,11 @@ export default function Home() {
         }
         setSelected(new Set());
         setSelectedRoleState(null);
+        setWorkTasks([]);
+        setCustomTasks([]);
+        setCheckedTaskIds(new Set());
+        setTasksLoadedFor(null);
+        setFriction("");
         setResult(null);
         setSelectedRecommendationId(null);
         setSubmittedRecommendationId(null);
@@ -145,6 +171,9 @@ export default function Home() {
       bootId: health.boot_id,
       selected: Array.from(selected),
       selectedRole,
+      selectedTaskIds: Array.from(checkedTaskIds),
+      customTasks,
+      friction,
       result,
       selectedRecommendationId,
       submittedRecommendationId,
@@ -162,6 +191,9 @@ export default function Home() {
     health,
     selected,
     selectedRole,
+    checkedTaskIds,
+    customTasks,
+    friction,
     result,
     selectedRecommendationId,
     submittedRecommendationId,
@@ -173,7 +205,8 @@ export default function Home() {
     buildJobId,
   ]);
 
-  const selectionKey = `${selectedRole ?? ""}::${Array.from(selected).sort().join(",")}`;
+  const taskKey = Array.from(checkedTaskIds).sort().join(",");
+  const selectionKey = `${selectedRole ?? ""}::${Array.from(selected).sort().join(",")}::${taskKey}::${friction.trim()}`;
 
   useEffect(() => {
     if (!sessionReady) return;
@@ -200,11 +233,49 @@ export default function Home() {
       });
   };
 
+  useEffect(() => {
+    if (!selectedRole) {
+      setWorkTasks([]);
+      setTasksLoadedFor(null);
+      return;
+    }
+    let cancelled = false;
+    listWorkTasks(selectedRole)
+      .then((tasks) => {
+        if (cancelled) return;
+        setWorkTasks(tasks);
+        setCheckedTaskIds((current) => {
+          const restored = restoredTasks.current;
+          if (restored && restored.role === selectedRole) {
+            restoredTasks.current = null;
+            return new Set(restored.ids);
+          }
+          const next = new Set(tasks.map((task) => task.id));
+          for (const id of current) {
+            if (id.startsWith("custom-")) next.add(id);
+          }
+          return next;
+        });
+        setTasksLoadedFor(selectedRole);
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setError(e.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedRole]);
+
   const onRoleChange = (roleId: string) => {
     if (roleId === selectedRole) {
       setSelectedRoleState(null);
+      setCustomTasks([]);
+      setCheckedTaskIds(new Set());
       return;
     }
+    setCustomTasks([]);
+    setCheckedTaskIds(new Set());
+    setTasksLoadedFor(null);
     setSelectedRoleState(roleId);
     setSelectedRole(roleId).catch((e: Error) => setError(e.message));
   };
@@ -229,6 +300,11 @@ export default function Home() {
           a.display_name.localeCompare(b.display_name),
         );
     setRoles(next);
+    if (added.id !== selectedRole) {
+      setCustomTasks([]);
+      setCheckedTaskIds(new Set());
+      setTasksLoadedFor(null);
+    }
     setSelectedRoleState(added.id);
     setSelectedRole(added.id).catch((e: Error) => setError(e.message));
   };
@@ -249,6 +325,36 @@ export default function Home() {
     });
   };
 
+  const toggleTask = (id: string) => {
+    setCheckedTaskIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const addTask = (label: string) => {
+    const id = `custom-${Date.now()}`;
+    const task: TaskChoice = {
+      id,
+      label,
+      detail: "Added from the work you actually do.",
+      source: "actual",
+    };
+    setCustomTasks((prev) => [...prev, task]);
+    setCheckedTaskIds((prev) => new Set(prev).add(id));
+  };
+
+  const removeTask = (id: string) => {
+    setCustomTasks((prev) => prev.filter((task) => task.id !== id));
+    setCheckedTaskIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  };
+
   const toggle = (name: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -257,6 +363,16 @@ export default function Home() {
       return next;
     });
   };
+
+  const taskRows: TaskChoice[] = [...workTasks, ...customTasks];
+  const taskSelections = (): TaskSelection[] =>
+    taskRows
+      .filter((task) => checkedTaskIds.has(task.id))
+      .map((task) => ({
+        id: task.id,
+        label: task.label,
+        source: task.source,
+      }));
 
   const submit = async () => {
     setLoading(true);
@@ -269,9 +385,15 @@ export default function Home() {
     setSubmittedCustomRecommendation(null);
     setBuildJobId(null);
     try {
+      const confirmed =
+        selectedRole && tasksLoadedFor === selectedRole
+          ? taskSelections()
+          : undefined;
       const job = await startEnablementJob(
         Array.from(selected),
         selectedRole ?? undefined,
+        confirmed,
+        friction.trim(),
       );
       setEnablementJobId(job.id);
       setEnablementStartedAt(Date.parse(job.started_at));
@@ -399,10 +521,12 @@ export default function Home() {
   return (
     <main className="space-y-8">
       <header>
-        <h1 className="text-2xl font-bold">Enable AI — test UI</h1>
+        <h1 className="text-2xl font-bold">Enable AI — Agent Architect</h1>
         <p className="mt-1 text-sm text-neutral-600">
-          Pick a role, then search for the tools you want. The Enablement Agent
-          proposes recommendations; pick one to hand to a Grokbot.
+          Figure out what agent to build. Start from the work you actually do,
+          then design the workflows you supervise. The blueprint feeds OpenAI
+          Agents SDK, Claude, LangGraph, n8n, Copilot Studio, Zapier, and
+          custom MCP.
         </p>
         {health && (
           <p className="mt-2 text-xs text-neutral-500">
@@ -417,9 +541,9 @@ export default function Home() {
 
       <section>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold">1. Pick your role</h2>
+          <h2 className="text-base font-semibold">1. Work intelligence</h2>
           <span className="text-xs text-neutral-500">
-            Loads role-specific agent context
+            Role, then the tasks you actually do
           </span>
         </div>
         <RolePicker
@@ -430,11 +554,21 @@ export default function Home() {
           onDeleteCached={onDeleteCachedRole}
           disabled={loading}
         />
+        {selectedRole && (
+          <WorkIntelligence
+            tasks={taskRows}
+            selectedIds={checkedTaskIds}
+            onToggle={toggleTask}
+            onAdd={addTask}
+            onRemove={removeTask}
+            disabled={loading}
+          />
+        )}
       </section>
 
       <section>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold">2. Select your tools</h2>
+          <h2 className="text-base font-semibold">2. Tools and friction</h2>
           <span className="text-xs text-neutral-500">
             {selected.size} of {tools.length} selected
           </span>
@@ -453,6 +587,18 @@ export default function Home() {
             disabled={loading}
           />
         )}
+        <label className="mt-4 block text-sm font-medium" htmlFor="work-friction">
+          Where this work gets stuck
+        </label>
+        <textarea
+          id="work-friction"
+          value={friction}
+          onChange={(event) => setFriction(event.target.value)}
+          disabled={loading}
+          rows={3}
+          placeholder="Name the retyping, the wait, or the handoff that breaks."
+          className="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm"
+        />
       </section>
 
       <section>
@@ -501,7 +647,10 @@ export default function Home() {
 
       {result && !loading && (
         <section>
-          <h2 className="mb-3 text-base font-semibold">4. Plan</h2>
+          <h2 className="mb-3 text-base font-semibold">4. Agent Blueprint</h2>
+          {result.blueprint && (
+            <AgentBlueprintView blueprint={result.blueprint} />
+          )}
           <PlanDisplay response={result} />
         </section>
       )}
