@@ -24,6 +24,7 @@ from typing import Any
 from claude_agent_sdk import AgentDefinition
 
 from coordinator.definition import SUBMIT_PLAN_TOOL_NAME
+from core.plan_grounding import CROSS_TOOL_PLAN_INSTRUCTIONS
 from core.roles import Role, list_roles
 from enablement_agents.support.tools import (
     LOOKUP_TOOL_QUALIFIED_NAME,
@@ -178,15 +179,17 @@ def _build_role_prompt(role: Role) -> str:
         "5. For each tool in the stack, write a finding for work that tool's "
         "catalog record can do. Status is covered, partial, gap, or "
         "redundant. Cite the tool names. Do not score a fixed role checklist "
-        "the tools cannot perform.\n"
-        "6. Translate those findings into recommendations that use the "
-        "selected tools together. If the tools look unrelated, invent one "
+        "the tools cannot perform. When two or more tools are selected, lead "
+        "with relationship findings that use every selected tool together.\n"
+        "6. Translate those findings into several recommendations that use "
+        "the selected tools together. If the tools look unrelated, invent one "
         "coherent cross-tool workflow from their catalog capabilities. Every "
         "recommendation has a `kind` from `{use_native_ai, "
         "augment_with_custom_ai, consolidate, orchestrate}` and an `effort` "
         "from `{small, medium, large}`. Set a high bar for `use_native_ai` — "
         "only when the native feature is genuinely sufficient with no "
-        "augmentation.\n"
+        "augmentation.\n\n"
+        f"{CROSS_TOOL_PLAN_INSTRUCTIONS}\n"
         "7. Populate `orchestrator_pr_plan` *if* the Coordinator's "
         "invocation asked you to. This is metadata only — describe the "
         "orchestrator a later invocation will produce. Do not invent env "

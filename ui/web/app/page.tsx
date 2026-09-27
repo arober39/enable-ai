@@ -482,23 +482,21 @@ export default function Home() {
             Live mode is on — each run hits Claude and costs money.
           </p>
         )}
+        {loading && (
+          <div className="mt-4">
+            <LoadingPanel
+              demoMode={!!health?.demo_mode}
+              startedAt={enablementStartedAt}
+              onStop={stopEnablement}
+            />
+          </div>
+        )}
       </section>
 
       {error && (
         <div className="rounded-md border border-rose-300 bg-rose-50 p-4 text-sm text-rose-800">
           <strong>Error:</strong> {error}
         </div>
-      )}
-
-      {loading && (
-        <section>
-          <h2 className="mb-3 text-base font-semibold">4. In progress</h2>
-          <LoadingPanel
-            demoMode={!!health?.demo_mode}
-            startedAt={enablementStartedAt}
-            onStop={stopEnablement}
-          />
-        </section>
       )}
 
       {result && !loading && (

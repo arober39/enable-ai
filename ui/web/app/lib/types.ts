@@ -22,11 +22,20 @@ export interface ToolSummary {
   source: ToolSource;
 }
 
+export type FindingFocus = "tool" | "relationship";
+
+export interface ResearchSource {
+  title: string;
+  evidence: string;
+  source: string;
+}
+
 export interface CapabilityFinding {
   capability: string;
   status: CapabilityStatus;
   tools_involved: string[];
   notes: string | null;
+  focus?: FindingFocus;
 }
 
 export interface Recommendation {
@@ -36,6 +45,7 @@ export interface Recommendation {
   tools_affected: string[];
   effort: Effort;
   notes: string | null;
+  research?: ResearchSource[];
 }
 
 export interface OrchestratorPRPlan {

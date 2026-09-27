@@ -4,6 +4,7 @@ import { useState } from "react";
 import { saveRecommendation } from "../lib/api";
 import { CUSTOM_RECOMMENDATION_ID } from "../lib/customRecommendation";
 import type { EnablementPlan, Recommendation } from "../lib/types";
+import ResearchKit from "./ResearchKit";
 
 const KIND_STYLES: Record<Recommendation["kind"], string> = {
   use_native_ai: "bg-sky-100 text-sky-800",
@@ -76,8 +77,23 @@ export default function BuildOrchestrator({
     if (!customSelected) onSelectRecommendation(CUSTOM_RECOMMENDATION_ID);
   };
 
+  const researched = recs.some((rec) => (rec.research?.length ?? 0) > 0);
+
   return (
     <div className="space-y-4">
+      {researched && (
+        <section
+          aria-label="Research kit"
+          className="rounded-lg border border-sky-200 bg-sky-50/70 p-4"
+        >
+          <h3 className="text-sm font-semibold text-sky-950">Research kit</h3>
+          <p className="mt-1 text-sm leading-relaxed text-neutral-700">
+            Each recommendation cites the tool catalog — notes, native features,
+            and API or MCP availability — so the idea is documented and doable.
+            Open a recommendation to read the evidence behind it.
+          </p>
+        </section>
+      )}
       {recs.length === 0 ? (
         <div className="rounded-lg border border-neutral-300 bg-white p-4 text-sm text-neutral-500">
           Plan returned no recommendations.
@@ -136,6 +152,7 @@ export default function BuildOrchestrator({
                   {r.notes && (
                     <div className="mt-1 text-xs text-neutral-700">{r.notes}</div>
                   )}
+                  <ResearchKit items={r.research ?? []} />
                   <div className="mt-2">
                     <button
                       type="button"

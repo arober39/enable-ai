@@ -203,6 +203,70 @@ def test_already_grounded_plan_is_kept(isolated_state: Path) -> None:
     assert kept.summary == plan.summary
 
 
+def test_github_and_discord_findings_relate_the_tools(isolated_state: Path) -> None:
+    user = _user()
+    role = load_role("devrel")
+    plan = build_synthetic_plan(["github", "discord"], role, user)
+    related = [finding for finding in plan.capability_coverage if finding.focus == "relationship"]
+    assert len(related) >= 2
+    notes = "\n".join(finding.notes or "" for finding in related).lower()
+    assert "github" in notes and "discord" in notes
+    assert "combine" in notes
+    assert "workflow" in notes
+    assert "1." in notes and "2." in notes
+    for finding in related:
+        assert set(finding.tools_involved) == {"github", "discord"}
+    singles = [finding for finding in plan.capability_coverage if finding.focus == "tool"]
+    assert ("github",) in {tuple(finding.tools_involved) for finding in singles}
+    assert ("discord",) in {tuple(finding.tools_involved) for finding in singles}
+    assert len(plan.recommendations) >= 4
+    blob = _plan_blob(plan)
+    assert "claude" in blob
+    assert "chatgpt" in blob or "openai" in blob
+    for rec in plan.recommendations:
+        assert set(rec.tools_affected) <= {"github", "discord"}
+        assert rec.tools_affected
+        assert rec.research
+        assert all(item.title and item.evidence and item.source for item in rec.research)
+
+
+def test_jira_and_discord_workflow_uses_both_tools(isolated_state: Path) -> None:
+    user = _user()
+    cache_tool(
+        user,
+        _cap(
+            "jira",
+            "Jira",
+            ["issue_tracking"],
+            "Tracks work items. Native AI does not read Discord threads.",
+            mcp=True,
+        ),
+    )
+    role = load_role("devrel")
+    plan = build_synthetic_plan(["jira", "discord"], role, user)
+    related = [finding for finding in plan.capability_coverage if finding.focus == "relationship"]
+    notes = "\n".join(finding.notes or "" for finding in related).lower()
+    assert "jira" in notes and "discord" in notes
+    assert "work item" in notes or "track" in notes
+    assert "community" in notes or "thread" in notes
+    assert any(len(finding.tools_involved) == 2 for finding in related)
+
+
+def test_travel_plan_skips_idea_generation(isolated_state: Path) -> None:
+    user = _user()
+    cache_tool(user, _navan())
+    cache_tool(user, _gmail())
+    plan = build_synthetic_plan(["navan", "gmail"], load_role("devrel"), user)
+    blob = _plan_blob(plan)
+    assert "chatgpt" not in blob
+    assert "openai" not in blob
+    assert any(finding.focus == "relationship" for finding in plan.capability_coverage)
+    for theme in _PLAYBOOK:
+        assert theme not in blob
+    assert plan.recommendations
+    assert all(rec.research for rec in plan.recommendations)
+
+
 def test_live_prompt_is_conditioned_on_selected_tool_ids() -> None:
     role = load_role("devrel")
     message = _build_user_message(["navan", "gmail"], "sess-1", role, _user())
@@ -214,3 +278,8 @@ def test_live_prompt_is_conditioned_on_selected_tool_ids() -> None:
     assert "tutorial and blog drafting" not in message
     assert "code sample generation and verification" not in message
     assert "Compare the declared stack against these" not in message
+    assert "relationship" in message
+    assert "research" in message
+    assert "ChatGPT" in message or "OpenAI" in message
+    assert "Claude" in message
+    assert "relationship" in system
