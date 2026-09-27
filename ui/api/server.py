@@ -1018,6 +1018,10 @@ class GrokbotHandoffRequest(BaseModel):
     role_name: str = Field(min_length=1)
     role_id: str | None = None
     tools: list[str] = Field(default_factory=list)
+    blueprint: AgentBlueprint | None = Field(
+        default=None,
+        description="The blueprint Agent Architect compiled before Jev placement.",
+    )
 
 
 @app.post("/api/grokbot/handoff", response_model=GrokbotHandoff)
@@ -1042,6 +1046,7 @@ def grokbot_handoff(req: GrokbotHandoffRequest) -> GrokbotHandoff:
         role_name=req.role_name,
         role_id=req.role_id,
         tools=req.tools,
+        blueprint=req.blueprint,
         creds=creds,
         user=user,
     )
@@ -1056,6 +1061,7 @@ def grokbot_handoff(req: GrokbotHandoffRequest) -> GrokbotHandoff:
         role_name=req.role_name,
         role_id=req.role_id,
         tools=req.tools,
+        blueprint=req.blueprint,
         existing_bot_name=handoff.existing_bot_name,
     )
     if delivery.status == "sent":

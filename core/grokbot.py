@@ -1,8 +1,8 @@
 """Copy-paste Grok Bot handoff, with an optional Jev placement.
 
-Step 6 asks Jev whether the recommendation is a new bot or belongs on an
-existing one, then shows text the user pastes into Grok Bot. It never calls
-createAgent or updateAgent. listAgents runs only when gateway credentials
+Step 6 asks Jev whether the compiled Agent Blueprint belongs on a new bot or
+an existing one. Step 7 shows the blueprint-aware text to paste into Grok Bot.
+It never calls createAgent or updateAgent. listAgents runs only when gateway credentials
 are present. Bots named by earlier handoffs in this process are remembered
 under `agent-state/<user_id>/grokbot_roster.json` and sent to Jev even when
 the gateway is unset. The API deletes those files on startup. A remembered
@@ -27,6 +27,7 @@ import httpx
 from dotenv import dotenv_values
 from pydantic import BaseModel, ConfigDict, Field
 
+from core.agent_architect import AgentBlueprint
 from core.credentials import Credentials
 from core.grokbot_roster import (
     RememberedBot,
@@ -137,6 +138,7 @@ def assignment_text(
     notes: str | None,
     role_name: str,
     tools: list[str],
+    blueprint: AgentBlueprint | None = None,
 ) -> str:
     """The bot's job to paste into Grok Bot.
 
@@ -146,14 +148,71 @@ def assignment_text(
     text = description.strip()
     extra = (notes or "").strip()
     tool_list = ", ".join(tools) if tools else "the tools named in the task"
-    parts = [
-        f"You are the {role_name} bot.",
-        f"Tools you should use: {tool_list}",
-        text,
-    ]
+    if blueprint is None:
+        parts = [
+            f"You are the {role_name} bot.",
+            f"Tools you should use: {tool_list}",
+            text,
+        ]
+    else:
+        parts = [
+            "Agent Architect produced this Agent Blueprint. "
+            "Jev places or builds from it; do not redesign the architecture.",
+            f"Recommended agent: {role_name} bot",
+            _section("Supervision goal", [blueprint.supervision_shift]),
+            _section("Current workflow", [blueprint.current_workflow]),
+            _section("Friction to remove", blueprint.pain_points),
+            _section("Selected recommendation", [text]),
+            _section("Trigger", [blueprint.trigger]),
+            _section("Tools", blueprint.tools or tools or [tool_list]),
+            _section("Agent responsibilities", blueprint.agent_responsibilities),
+            _section("Autonomous actions", blueprint.autonomous_actions),
+            _section("Human-in-the-loop", blueprint.human_in_the_loop),
+            _section("Architecture", [blueprint.architecture]),
+            _section(
+                "Supervision plan",
+                [
+                    (
+                        f"{item.label}: {item.classification}; "
+                        f"AI — {item.ai_steps} Human ({item.hitl}) — {item.human_steps}"
+                    )
+                    for item in blueprint.assessments
+                ],
+            ),
+            _section(
+                "Build-with targets",
+                [
+                    f"{target.label}{' (recommended)' if target.recommended else ''}: "
+                    f"{target.why}"
+                    for target in blueprint.build_targets
+                ],
+            ),
+            _section(
+                "Multi-tool workflows",
+                [
+                    f"{item.label}: {item.ai_steps}"
+                    for item in blueprint.assessments
+                    if item.signals.context == "multi_tool"
+                ]
+                or ["No multi-tool task was confirmed."],
+            ),
+            _section(
+                "Autonomy rollout",
+                [blueprint.autonomy_note]
+                + [f"Guarded target: {flag}" for flag in blueprint.autonomy_flags],
+            ),
+        ]
     if extra:
-        parts.append(extra)
+        parts.append(_section("Recommendation notes", [extra]))
     return "\n\n".join(part for part in parts if part)
+
+
+def _section(title: str, lines: list[str]) -> str:
+    """Compact, copyable blueprint section for a Grok Bot description."""
+    clean = [line.strip() for line in lines if line.strip()]
+    if not clean:
+        return f"{title}: None."
+    return f"{title}:\n" + "\n".join(f"- {line}" for line in clean)
 
 
 def _bot_name(role_name: str) -> str:
@@ -220,6 +279,7 @@ def build_handoff(
     notes: str | None,
     role_name: str,
     tools: list[str],
+    blueprint: AgentBlueprint | None = None,
     creds: Credentials | None = None,
     user: UserContext | None = None,
     role_id: str | None = None,
@@ -239,6 +299,7 @@ def build_handoff(
         notes=notes,
         role_name=role_name,
         tools=tools,
+        blueprint=blueprint,
     )
     roster, used_memory = _roster(creds, owner)
     decision = _placement(
@@ -247,6 +308,9 @@ def build_handoff(
             "kind": kind,
             "description": description,
             "notes": notes,
+            "agent_blueprint": (
+                blueprint.model_dump(mode="json") if blueprint is not None else None
+            ),
         },
         role_name,
         roster,
@@ -520,14 +584,17 @@ def _placement(
             "kind": recommendation.get("kind"),
             "description": recommendation.get("description"),
             "notes": recommendation.get("notes"),
+            "agent_blueprint": recommendation.get("agent_blueprint"),
             "existing_bots": [_bot_view(bot) for bot in known_bots],
         },
         {
             "placement": {
                 "type": "choice",
                 "instructions": (
-                    "Should this recommendation be a new standalone bot, "
-                    "or added to one existing bot?"
+                    "Agent Architect already compiled the architecture. Place this "
+                    "Agent Blueprint on a new standalone bot or one existing bot; "
+                    "do not redesign it. Prefer an existing bot when its role and "
+                    "responsibilities already match."
                 ),
                 "criteria": criteria,
             }
