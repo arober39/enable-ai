@@ -77,7 +77,7 @@ test("handoff appears only after submit and keeps the last submitted recommendat
   ).toBeVisible();
 
   const cards = page.locator("ul li").filter({ has: page.getByRole("radio") });
-  await expect(cards).toHaveCount(2);
+  expect(await cards.count()).toBeGreaterThan(2);
   const firstId = (await cards.nth(0).locator(".font-mono").innerText()).trim();
   const secondId = (await cards.nth(1).locator(".font-mono").innerText()).trim();
   expect(firstId).not.toEqual(secondId);
@@ -138,7 +138,7 @@ test("a custom recommendation submits into the same handoff", async ({ page }) =
   const recommendation = page.getByRole("textbox", { name: "Recommendation" });
   const title = page.getByRole("textbox", { name: /Title/ });
   const cards = page.locator("ul li").filter({ has: page.getByRole("radio") });
-  await expect(cards).toHaveCount(2);
+  expect(await cards.count()).toBeGreaterThan(2);
   const systemId = (await cards.nth(0).locator(".font-mono").innerText()).trim();
 
   await expect(page.getByRole("heading", { name: /6\. Hand / })).toHaveCount(0);

@@ -196,7 +196,7 @@ export default function CredentialsManager() {
             })}
           </ul>
           <a href="/" className="mt-3 inline-block font-medium text-amber-950 underline">
-            Back to Enable AI
+            Back to Agent Architect
           </a>
         </div>
       )}

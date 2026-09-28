@@ -1,4 +1,4 @@
-"""FastAPI backend for the Enable AI UI.
+"""FastAPI backend for the Agent Architect demo.
 
 Endpoints:
   - GET    /api/tools                          — seed catalog + user's researched tools
@@ -9,6 +9,7 @@ Endpoints:
   - DELETE /api/roles/cache/{role_id}          — remove a researched role from the cache
   - GET    /api/preferences                    — current user's stored preferences
   - PUT    /api/preferences/role               — set the user's selected role
+  - GET    /api/work-tasks                     — baseline tasks for a role
   - POST   /api/enablement                     — run Enablement agent → EnablementPlan
   - POST   /api/build-workflow                 — Phase 2.1: 2-stage pipeline → WorkflowDefinition
   - GET    /api/workflows                      — list this user's persisted workflows
@@ -71,6 +72,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from coordinator.schemas import EnablementPlan, Recommendation
+from core.agent_architect import (
+    AgentBlueprint,
+    TaskSelection,
+    WorkTask,
+    compile_blueprint,
+    tasks_for_role,
+)
 from core.credentials import (
     LocalFileCredentialStore,
     credentials_in_env,
@@ -172,8 +180,8 @@ async def _lifespan(_app: FastAPI):
 
 
 app = FastAPI(
-    title="Enable AI — UI API",
-    description="Backend for the Next.js test UI. Hosts the Support agent.",
+    title="Agent Architect",
+    description="API for the Agent Architect demo. Compiles a supervision blueprint.",
     version="0.1.0",
     lifespan=_lifespan,
 )
@@ -228,13 +236,24 @@ class EnablementRequest(BaseModel):
         "stored preference is used; if no preference is set, defaults to "
         "the registry's default role.",
     )
+    tasks: list[TaskSelection] | None = Field(
+        default=None,
+        description="Tasks the person confirmed. Omit to use the role "
+        "baseline. Send an empty list when they confirmed none.",
+    )
+    friction: str = Field(
+        default="",
+        max_length=2000,
+        description="Where the work gets stuck, in the person's words.",
+    )
 
 
 class EnablementResponse(BaseModel):
-    """Wrapper exposing the agent's plan plus run metadata."""
+    """Wrapper exposing the agent's plan plus the agent blueprint."""
 
     mode: str  # "demo" or "live"
     plan: EnablementPlan
+    blueprint: AgentBlueprint
 
 
 class GenerateOrchestratorRequest(BaseModel):
@@ -305,6 +324,25 @@ def _resolve_role(user: UserContext, role_id: str) -> Role:
         return load_role_for_user(user, role_id)
     except KeyError:
         raise HTTPException(400, f"Unknown role: {role_id}") from None
+
+
+def _blueprint_for(
+    req: EnablementRequest,
+    role: Role,
+    user: UserContext,
+) -> AgentBlueprint:
+    """Compile the blueprint after the plan. Live schema stays unchanged."""
+    capabilities: list[ToolCapability] = []
+    for name in req.tools:
+        capability = load_tool(user, name)
+        if capability is not None:
+            capabilities.append(capability)
+    return compile_blueprint(
+        role=role,
+        capabilities=capabilities,
+        selected_tasks=req.tasks,
+        friction=req.friction,
+    )
 
 
 def _to_tool_summary(cap: ToolCapability) -> ToolSummary:
@@ -401,7 +439,11 @@ async def run_enablement(req: EnablementRequest) -> EnablementResponse:
             req.tools,
         )
         plan = build_synthetic_plan(req.tools, role, user)
-        return EnablementResponse(mode="demo", plan=plan)
+        return EnablementResponse(
+            mode="demo",
+            plan=plan,
+            blueprint=_blueprint_for(req, role, user),
+        )
 
     logger.info(
         "running enablement in LIVE mode role=%s tools=%s",
@@ -423,7 +465,23 @@ async def run_enablement(req: EnablementRequest) -> EnablementResponse:
                 "Check the backend terminal for the full traceback."
             ),
         ) from exc
-    return EnablementResponse(mode="live", plan=plan)
+    return EnablementResponse(
+        mode="live",
+        plan=plan,
+        blueprint=_blueprint_for(req, role, user),
+    )
+
+
+@app.get("/api/work-tasks", response_model=list[WorkTask])
+async def get_work_tasks(role: str) -> list[WorkTask]:
+    """Occupational and job-description tasks for a role.
+
+    The person's later checks outrank this list. Full O*NET ingest is deferred.
+    Developer Advocate / DevRel is the catalog filled in by hand.
+    """
+    user = _current_user()
+    resolved = _resolve_role(user, role)
+    return tasks_for_role(resolved)
 
 
 # ---------------------------------------------------------------------------
@@ -732,8 +790,8 @@ class BuildWorkflowRequest(BaseModel):
     plan: EnablementPlan
     selected_recommendation_id: str = Field(min_length=1)
     tools: list[str] = Field(
-        description="The full stack the user picked when running the "
-        "Enablement Agent. The workflow may legitimately reference any of "
+        description="The full stack the user picked when running "
+        "Agent Architect. The workflow may legitimately reference any of "
         "these tools, not just the recommendation's `tools_affected`."
     )
     role: str | None = Field(
@@ -785,7 +843,7 @@ async def build_workflow_endpoint(
         raise HTTPException(
             400,
             "BuildWorkflowRequest.tools is empty — pass the stack the user "
-            "selected when running the Enablement Agent.",
+            "selected when running Agent Architect.",
         )
     capabilities: list[ToolCapability] = []
     missing: list[str] = []

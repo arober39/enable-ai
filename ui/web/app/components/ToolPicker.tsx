@@ -143,11 +143,20 @@ export default function ToolPicker({
             return (
               <li
                 key={t.name}
-                className="flex items-start justify-between gap-3 px-3 py-2"
+                onClick={() => {
+                  if (!disabled) onToggle(t.name);
+                }}
+                className={
+                  "flex cursor-pointer items-start justify-between gap-3 px-3 py-2 " +
+                  (isSelected ? "bg-accent/5" : "hover:bg-neutral-50")
+                }
               >
                 <button
                   type="button"
-                  onClick={() => onToggle(t.name)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onToggle(t.name);
+                  }}
                   disabled={disabled}
                   className="flex-1 text-left"
                 >
@@ -179,7 +188,10 @@ export default function ToolPicker({
                   {t.source === "researched" && (
                     <button
                       type="button"
-                      onClick={() => tryDelete(t.name)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void tryDelete(t.name);
+                      }}
                       disabled={disabled}
                       className="text-xs text-rose-600 hover:underline"
                     >
@@ -188,7 +200,10 @@ export default function ToolPicker({
                   )}
                   <button
                     type="button"
-                    onClick={() => onToggle(t.name)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onToggle(t.name);
+                    }}
                     disabled={disabled}
                     className={
                       "rounded px-2 py-1 text-xs " +

@@ -55,7 +55,7 @@ def build_synthetic_plan(
             continue
         loaded.append(cap)
 
-    findings = grounded_findings(loaded, missing=missing, creds=creds)
+    findings = grounded_findings(loaded, missing=missing, creds=creds, role=role)
     recs = grounded_recommendations(loaded, role)
     summary = grounded_summary(loaded, role, synthetic=True)
     if missing:

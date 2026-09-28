@@ -1,6 +1,8 @@
-# Enable AI — Test UI
+# Agent Architect
 
-A minimal two-tier app for hands-on testing of the Support Enablement Agent:
+The demo UI for deciding what agent to build. It starts from the work someone actually does, classifies what they should supervise, and writes a blueprint that feeds OpenAI Agents SDK, Claude, LangGraph, n8n, Copilot Studio, Zapier, or custom MCP.
+
+The app is two tiers:
 
 - **Backend** (`ui/api/`): FastAPI hosting the agent. Returns the catalog and runs `produce_plan`.
 - **Frontend** (`ui/web/`): Next.js 15 + TypeScript + Tailwind. Picks tools, renders the plan.
@@ -137,8 +139,8 @@ What it does **not** cover:
                                                   │
                                                   ▼
                                     ┌─────────────────────────────┐
-                                    │ Support Enablement Agent    │
-                                    │ (real LLM or synthetic stub)│
+                                    │ Agent Architect             │
+                                    │ (blueprint, demo or live)   │
                                     └─────────────────────────────┘
 ```
 

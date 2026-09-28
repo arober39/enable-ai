@@ -22,11 +22,20 @@ export interface ToolSummary {
   source: ToolSource;
 }
 
+export type FindingFocus = "tool" | "relationship";
+
+export interface ResearchSource {
+  title: string;
+  evidence: string;
+  source: string;
+}
+
 export interface CapabilityFinding {
   capability: string;
   status: CapabilityStatus;
   tools_involved: string[];
   notes: string | null;
+  focus?: FindingFocus;
 }
 
 export interface Recommendation {
@@ -36,6 +45,7 @@ export interface Recommendation {
   tools_affected: string[];
   effort: Effort;
   notes: string | null;
+  research?: ResearchSource[];
 }
 
 export interface OrchestratorPRPlan {
@@ -64,9 +74,79 @@ export interface EnablementPlan {
   metadata: PlanMetadata;
 }
 
+export type TaskSource = "occupational" | "job_description" | "actual";
+export type TaskClassification = "AUTOMATE" | "ASSIST" | "AGENTIC" | "HUMAN";
+export type HitlKind = "direct" | "review" | "approve" | "exception";
+export type SupervisionPotential = "low" | "moderate" | "high";
+
+export interface TaskChoice {
+  id: string;
+  label: string;
+  detail: string;
+  source: TaskSource;
+}
+
+export interface TaskSignal {
+  frequency: "rare" | "weekly" | "daily";
+  repetition: "low" | "medium" | "high";
+  judgment: "low" | "medium" | "high";
+  risk: "low" | "medium" | "high";
+  permissions: "read" | "draft" | "write";
+  context: "single_tool" | "multi_tool";
+  reversibility: "easy" | "costly" | "irreversible";
+}
+
+export interface WorkTask extends TaskChoice {
+  signals: TaskSignal;
+}
+
+export interface TaskSelection {
+  id: string;
+  label: string;
+  source: TaskSource;
+}
+
+export interface TaskAssessment {
+  task_id: string;
+  label: string;
+  source: TaskSource;
+  signals: TaskSignal;
+  classification: TaskClassification;
+  why: string;
+  deterministic_preferred: boolean;
+  supervision_potential: SupervisionPotential;
+  hitl: HitlKind;
+  ai_steps: string;
+  human_steps: string;
+}
+
+export interface BuildTarget {
+  id: string;
+  label: string;
+  recommended: boolean;
+  why: string;
+}
+
+export interface AgentBlueprint {
+  supervision_shift: string;
+  current_workflow: string;
+  pain_points: string[];
+  trigger: string;
+  agent_responsibilities: string[];
+  tools: string[];
+  autonomous_actions: string[];
+  human_in_the_loop: string[];
+  architecture: string;
+  assessments: TaskAssessment[];
+  build_targets: BuildTarget[];
+  autonomy_flags: string[];
+  autonomy_note: string;
+}
+
 export interface EnablementResponse {
   mode: "demo" | "live";
   plan: EnablementPlan;
+  blueprint: AgentBlueprint;
 }
 
 // ----- Phase 2.1 workflow DAG -----

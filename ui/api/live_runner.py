@@ -46,7 +46,7 @@ from anthropic.types import ToolUseBlock
 
 from coordinator.schemas import EnablementPlan
 from core.identity import UserContext
-from core.plan_grounding import apply_tool_grounding
+from core.plan_grounding import CROSS_TOOL_PLAN_INSTRUCTIONS, apply_tool_grounding
 from core.roles import Role
 from core.tool_catalog import ToolCapability, load_tool
 from enablement_agents.role_agent import resolve_role_agent_model
@@ -315,9 +315,9 @@ def _build_user_message(
     catalog_context = _gather_catalog_context(tools, user)
     role_lower = role.display_name.lower()
     return f"""\
-You are the {role.display_name} Enablement Agent for Enable AI.
+You are Agent Architect, compiling a blueprint for a {role.display_name}.
 
-Your task: produce a structured EnablementPlan for the tools listed below, for a person whose job is {role_lower}. Call `submit_enablement_plan` exactly once when your work is complete. That call is required even when tool choice is automatic — a text-only reply cannot be turned into a plan.
+Your task: produce a structured EnablementPlan for the tools listed below, for a person whose job is {role_lower}. The plan is the blueprint's evidence: what the tools can do together, and what the person would supervise. Call `submit_enablement_plan` exactly once when your work is complete. That call is required even when tool choice is automatic — a text-only reply cannot be turned into a plan.
 
 ## Selected tool ids
 
@@ -356,6 +356,8 @@ Every recommendation must name the selected tools it uses, and `tools_affected` 
 
 Set a high bar for `use_native_ai`. Default toward `augment_with_custom_ai` or `orchestrate` when the value is multi-tool.
 
+{CROSS_TOOL_PLAN_INSTRUCTIONS}
+
 ## Orchestrator PR plan
 
 Populate `orchestrator_pr_plan` describing the orchestrator that would be generated from these recommendations. Files to list under `files_to_create`:
@@ -392,13 +394,15 @@ def _build_system_prompt(role: Role) -> str:
     """
     dk = role.domain_knowledge_text()
     return f"""\
-You are the {role.display_name} Enablement Agent for Enable AI.
+You are Agent Architect. Compile a blueprint for a {role.display_name.lower()}: the work they actually do, what they should supervise, and which system should build it.
 
 Your job: reason over the tools the user selected and produce a structured EnablementPlan for a {role.display_name.lower()} teammate using those tools.
 
 You output the plan by calling the `submit_enablement_plan` tool exactly once when the plan is ready. That call is required even if tool choice is left on automatic — a prose-only reply is a failed run. You do not produce free-text reports. You do not call external APIs. You do not invent tools the user didn't include.
 
 Selected tools override the role playbook. Domain knowledge below is background for the job, not a checklist of findings. Do not emit a theme from that background unless the selected tools' catalog entries are about that work. Do not reuse an earlier plan's themes when the tool list changed. If the tools look unrelated, invent one coherent cross-tool workflow from their catalog capabilities.
+
+{CROSS_TOOL_PLAN_INSTRUCTIONS}
 
 ---
 

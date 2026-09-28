@@ -21,7 +21,7 @@ test.describe("Enable AI test UI", () => {
 
     // Page header
     await expect(
-      page.getByRole("heading", { name: /Enable AI/i })
+      page.getByRole("heading", { name: /Agent Architect/i })
     ).toBeVisible();
 
     // Catalog renders (4 tools)

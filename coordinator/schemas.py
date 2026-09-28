@@ -26,6 +26,25 @@ class PlanMetadata(BaseModel):
     coordinator_session_id: str = Field(description="Session id of the Coordinator run.")
 
 
+class ResearchSource(BaseModel):
+    """Catalog-backed evidence that a recommendation is doable."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(description="Short label for this piece of evidence.")
+    evidence: str = Field(
+        description=(
+            "What the catalog or product surface shows, and why the step is doable."
+        ),
+    )
+    source: str = Field(
+        description=(
+            "Where the evidence comes from, such as a tool's catalog notes, "
+            "a native feature, or its API."
+        ),
+    )
+
+
 class CapabilityFinding(BaseModel):
     """One assessment of how a functional capability is (or isn't) covered."""
 
@@ -36,10 +55,17 @@ class CapabilityFinding(BaseModel):
     tools_involved: list[str] = Field(
         description=(
             "Canonical tool names involved in covering (or failing to cover) "
-            "the capability."
+            "the capability. Relationship findings list every tool the workflow uses."
         ),
     )
     notes: str | None = None
+    focus: Literal["tool", "relationship"] = Field(
+        default="tool",
+        description=(
+            "tool: one selected tool's capability. relationship: how the "
+            "selected tools relate, how they combine, and a workflow that uses them together."
+        ),
+    )
 
 
 class Recommendation(BaseModel):
@@ -53,6 +79,13 @@ class Recommendation(BaseModel):
     tools_affected: list[str]
     effort: Literal["small", "medium", "large"]
     notes: str | None = None
+    research: list[ResearchSource] = Field(
+        default_factory=list,
+        description=(
+            "Documented backing for this recommendation. Cite catalog notes, "
+            "native features, or API and MCP availability so the idea is doable."
+        ),
+    )
 
 
 class OrchestratorPRPlan(BaseModel):

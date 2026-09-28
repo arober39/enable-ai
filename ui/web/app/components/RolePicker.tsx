@@ -147,8 +147,12 @@ export default function RolePicker({
           return (
             <div
               key={r.id}
+              onClick={() => {
+                if (!disabled) onSelect(r.id);
+              }}
               className={
-                "flex h-full items-start justify-between gap-3 rounded-lg border px-3 py-2 transition " +
+                "flex h-full cursor-pointer items-start justify-between gap-3 rounded-lg border px-3 py-2 transition " +
+                (disabled ? "cursor-not-allowed opacity-60 " : "") +
                 (isActive
                   ? "border-accent bg-accent/5"
                   : "border-neutral-300 bg-white")
@@ -156,7 +160,10 @@ export default function RolePicker({
             >
               <button
                 type="button"
-                onClick={() => onSelect(r.id)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSelect(r.id);
+                }}
                 disabled={disabled}
                 className={
                   "flex-1 text-left " +
@@ -183,7 +190,10 @@ export default function RolePicker({
                 {r.source === "seed" && (
                   <button
                     type="button"
-                    onClick={() => researchSeed(r)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void researchSeed(r);
+                    }}
                     disabled={disabled || researchingId === r.id}
                     className="text-xs text-accent hover:underline"
                   >
@@ -193,7 +203,10 @@ export default function RolePicker({
                 {r.source === "researched" && (
                   <button
                     type="button"
-                    onClick={() => tryDelete(r)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void tryDelete(r);
+                    }}
                     disabled={disabled}
                     className="text-xs text-rose-600 hover:underline"
                   >
@@ -202,7 +215,10 @@ export default function RolePicker({
                 )}
                 <button
                   type="button"
-                  onClick={() => onSelect(r.id)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onSelect(r.id);
+                  }}
                   disabled={disabled}
                   className={
                     "rounded px-2 py-1 text-xs " +
@@ -211,7 +227,7 @@ export default function RolePicker({
                       : "border border-neutral-300 text-neutral-700 hover:bg-neutral-50")
                   }
                 >
-                  {isActive ? "Selected" : "Add"}
+                  {isActive ? "Selected" : "Select"}
                 </button>
               </div>
             </div>

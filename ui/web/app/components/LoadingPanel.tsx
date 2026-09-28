@@ -43,15 +43,15 @@ export default function LoadingPanel({ demoMode, startedAt, onStop }: Props) {
         <Spinner className="h-7 w-7 text-accent" />
         <div className="flex-1">
           <h3 className="font-semibold text-ink">
-            Running Enablement Agent…
+            Running Agent Architect…
           </h3>
           <p className="mt-1 text-sm text-neutral-700">
             {demoMode ? (
-              <>Building synthetic plan from the tool catalog. Should take under a second.</>
+              <>Building a synthetic blueprint from the tool catalog. Should take under a second.</>
             ) : (
               <>
-                Agent is gathering tool capabilities, consulting domain
-                knowledge, and drafting recommendations. This typically takes
+                Agent Architect is reading the tools you selected and drafting
+                the blueprint. This typically takes
                 <span className="font-medium"> 10–30 seconds</span> in live mode.
               </>
             )}
