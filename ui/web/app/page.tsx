@@ -493,9 +493,9 @@ export default function Home() {
     isCustomRecommendationId(submittedRecommendation?.id) &&
     !sameHandoffRecommendation(customDraft, submittedRecommendation);
   const handoffHint = !submittedRecommendation
-    ? "Select a recommendation and press Submit to hand it to Grokbot."
+    ? "Select a recommendation and press Submit to ask Jev to place the Agent Blueprint."
     : (draftId && draftId !== submittedRecommendation.id) || customDirty
-      ? `The Grokbot handoff stays on ${submittedRecommendation.id} until you submit again.`
+      ? `Jev's placement stays on ${submittedRecommendation.id} until you submit again.`
       : null;
   const canSubmitRecommendation = customSelected
     ? customDraft != null
@@ -661,8 +661,9 @@ export default function Home() {
             5. Pick one recommendation
           </h2>
           <p className="mb-3 text-sm text-neutral-700">
-            Pick a recommendation to hand to Grokbot, or suggest your own.
-            Grok Bot does the work.
+            Agent Architect produced the blueprint. Pick a recommendation to
+            submit with it, or suggest your own; Jev will place that blueprint
+            on a new or existing Grok Bot.
           </p>
           <BuildOrchestrator
             plan={result.plan}
@@ -698,7 +699,7 @@ export default function Home() {
       {result && !loading && selectedRole && submittedRecommendation && (
         <section>
           <h2 className="mb-3 text-base font-semibold">
-            6. Hand {submittedRecommendation.id} to Grokbot
+            6. Ask Jev to place {submittedRecommendation.id}
           </h2>
           <GrokbotHandoff
             key={`${submittedRecommendation.id}:${handoffSubmitVersion}`}
@@ -710,6 +711,7 @@ export default function Home() {
                 ? submittedRecommendation.tools_affected
                 : Array.from(selected)
             }
+            blueprint={result.blueprint}
           />
         </section>
       )}

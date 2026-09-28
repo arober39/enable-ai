@@ -20,6 +20,7 @@ from urllib.parse import urlparse
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
 
+from core.agent_architect import AgentBlueprint
 from core.credentials import Credentials
 from core.grokbot import WEBHOOK_KEY_ENV, WEBHOOK_URL_ENV, PlacementAction
 
@@ -48,6 +49,7 @@ class GrokbotWebhookPayload(BaseModel):
     role_name: str
     role_id: str | None = None
     tools: list[str] = Field(default_factory=list)
+    blueprint: AgentBlueprint | None = None
     existing_bot_name: str | None = None
 
 
@@ -71,6 +73,7 @@ def build_webhook_payload(
     role_name: str,
     role_id: str | None,
     tools: list[str],
+    blueprint: AgentBlueprint | None = None,
     existing_bot_name: str | None,
 ) -> GrokbotWebhookPayload:
     """Shape the handoff into the webhook JSON body."""
@@ -87,6 +90,7 @@ def build_webhook_payload(
         role_name=role_name,
         role_id=role,
         tools=list(tools),
+        blueprint=blueprint,
         existing_bot_name=existing,
     )
 
@@ -103,6 +107,7 @@ def deliver_handoff_webhook(
     role_name: str,
     role_id: str | None,
     tools: list[str],
+    blueprint: AgentBlueprint | None = None,
     existing_bot_name: str | None,
 ) -> HandoffWebhookResult:
     """POST the handoff when both webhook settings are set.
@@ -128,6 +133,7 @@ def deliver_handoff_webhook(
                 role_name=role_name,
                 role_id=role_id,
                 tools=tools,
+                blueprint=blueprint,
                 existing_bot_name=existing_bot_name,
             ),
         )

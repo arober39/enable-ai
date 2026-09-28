@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 import core.grokbot_roster as roster
+from core.agent_architect import AgentBlueprint
 from core.grokbot import (
     GrokbotHandoff,
     HandoffCredentials,
@@ -102,6 +103,55 @@ def _body() -> str:
     )
 
 
+def _blueprint() -> AgentBlueprint:
+    return AgentBlueprint.model_validate(
+        {
+            "supervision_shift": "Supervise the community pipeline.",
+            "current_workflow": "DevRel copies Discord themes into GitHub by hand.",
+            "pain_points": ["The same context is retyped."],
+            "trigger": "Start when a Discord thread becomes a recurring theme.",
+            "agent_responsibilities": [
+                "Read Discord, open a GitHub issue, then draft the content brief."
+            ],
+            "tools": ["discord", "github"],
+            "autonomous_actions": ["Cluster threads and prepare the issue."],
+            "human_in_the_loop": ["Review the issue before publishing."],
+            "architecture": "One bounded agent with a deterministic publish gate.",
+            "assessments": [
+                {
+                    "task_id": "community_intelligence",
+                    "label": "Community intelligence",
+                    "source": "occupational",
+                    "signals": {
+                        "frequency": "daily",
+                        "repetition": "high",
+                        "judgment": "medium",
+                        "risk": "low",
+                        "permissions": "read",
+                        "context": "multi_tool",
+                        "reversibility": "easy",
+                    },
+                    "classification": "AGENTIC",
+                    "why": "The work crosses tools.",
+                    "deterministic_preferred": False,
+                    "supervision_potential": "high",
+                    "hitl": "review",
+                    "ai_steps": "Read Discord and prepare a GitHub issue.",
+                    "human_steps": "Review the issue.",
+                }
+            ],
+            "build_targets": [
+                {
+                    "id": "openai_agents",
+                    "label": "OpenAI Agents SDK",
+                    "recommended": True,
+                    "why": "Fits the bounded multi-tool workflow.",
+                }
+            ],
+        }
+    )
+
+
 def test_handoff_text_assigns_the_work_and_lists_the_tools() -> None:
     handoff = _sample_handoff()
     parsed = GrokbotHandoff.model_validate(handoff.model_dump())
@@ -116,6 +166,46 @@ def test_handoff_text_assigns_the_work_and_lists_the_tools() -> None:
     assert parsed.title == "Developer Relations"
     assert parsed.webhook_status is None
     assert parsed.webhook_message is None
+
+
+def test_blueprint_handoff_keeps_architecture_supervision_and_build_targets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: dict[str, object] = {}
+
+    def _decide(state: dict, questions: object, creds: object) -> dict[str, object]:
+        seen["state"] = state
+        seen["questions"] = questions
+        return {
+            "mode": "real",
+            "reason": None,
+            "answers": {"placement": {"choice": "new_bot", "confidence": 0.9}},
+        }
+
+    monkeypatch.setattr("core.grokbot.decide", _decide)
+    handoff = _sample_handoff(
+        blueprint=_blueprint(),
+        creds=_Creds({"JEV_API_KEY": "jv_test"}),
+    )
+
+    assert "Agent Architect produced this Agent Blueprint" in handoff.description
+    assert "Recommended agent: Developer Relations bot" in handoff.description
+    assert "Current workflow:\n- DevRel copies Discord themes" in handoff.description
+    assert "Friction to remove:\n- The same context is retyped." in handoff.description
+    assert "Tools:\n- discord\n- github" in handoff.description
+    assert "Autonomous actions:\n- Cluster threads" in handoff.description
+    assert "Human-in-the-loop:\n- Review the issue" in handoff.description
+    assert "Architecture:\n- One bounded agent" in handoff.description
+    assert "Supervision plan:\n- Community intelligence: AGENTIC" in handoff.description
+    assert "Build-with targets:\n- OpenAI Agents SDK (recommended)" in handoff.description
+    assert "Multi-tool workflows:\n- Community intelligence" in handoff.description
+    state = seen["state"]
+    assert isinstance(state, dict)
+    assert state["agent_blueprint"]["architecture"] == (  # type: ignore[index]
+        "One bounded agent with a deterministic publish gate."
+    )
+    assert state["existing_bots"] == []
+    assert "do not redesign it" in str(seen["questions"])
 
 
 def test_missing_jev_key_says_so_and_defaults_to_a_new_bot(

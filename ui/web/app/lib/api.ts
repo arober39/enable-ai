@@ -1,4 +1,5 @@
 import type {
+  AgentBlueprint,
   CredentialRevealResponse,
   CredentialSummary,
   RequiredCredentials,
@@ -275,10 +276,10 @@ export function fetchGrokbotHandoff(args: {
   role_name: string;
   role_id?: string | null;
   tools: string[];
+  blueprint: AgentBlueprint;
 }): Promise<GrokbotHandoffText> {
   return fetchJson<GrokbotHandoffText>("/api/grokbot/handoff", {
     method: "POST",
     body: JSON.stringify(args),
   });
 }
-

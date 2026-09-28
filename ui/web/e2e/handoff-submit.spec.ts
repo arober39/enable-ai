@@ -73,7 +73,9 @@ test("handoff appears only after submit and keeps the last submitted recommendat
   await expect(submit).toBeDisabled();
   await expect(page.getByRole("heading", { name: /6\. Hand / })).toHaveCount(0);
   await expect(
-    page.getByText("Select a recommendation and press Submit to hand it to Grokbot."),
+    page.getByText(
+      "Select a recommendation and press Submit to ask Jev to place the Agent Blueprint.",
+    ),
   ).toBeVisible();
 
   const cards = page.locator("ul li").filter({ has: page.getByRole("radio") });
@@ -88,7 +90,7 @@ test("handoff appears only after submit and keeps the last submitted recommendat
 
   await submit.click();
   const firstHeading = page.getByRole("heading", {
-    name: `6. Hand ${firstId} to Grokbot`,
+    name: `6. Ask Jev to place ${firstId}`,
   });
   await expect(firstHeading).toBeVisible();
   await expect(page.getByText("Preparing the assignment…")).toHaveCount(0);
@@ -105,17 +107,17 @@ test("handoff appears only after submit and keeps the last submitted recommendat
   await cards.nth(1).getByRole("radio").check();
   await expect(firstHeading).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: `6. Hand ${secondId} to Grokbot` }),
+    page.getByRole("heading", { name: `6. Ask Jev to place ${secondId}` }),
   ).toHaveCount(0);
   await expect(
     page.getByText(
-      `The Grokbot handoff stays on ${firstId} until you submit again.`,
+      `Jev's placement stays on ${firstId} until you submit again.`,
     ),
   ).toBeVisible();
 
   await submit.click();
   await expect(
-    page.getByRole("heading", { name: `6. Hand ${secondId} to Grokbot` }),
+    page.getByRole("heading", { name: `6. Ask Jev to place ${secondId}` }),
   ).toBeVisible();
   await expect(firstHeading).toHaveCount(0);
   await expect(remembered).toBeVisible();
@@ -164,7 +166,7 @@ test("a custom recommendation submits into the same handoff", async ({ page }) =
   await submit.click();
 
   const customHeading = page.getByRole("heading", {
-    name: "6. Hand R-CUSTOM to Grokbot",
+    name: "6. Ask Jev to place R-CUSTOM",
   });
   await expect(customHeading).toBeVisible();
   await expect(page.getByText("Preparing the assignment…")).toHaveCount(0);
@@ -182,12 +184,12 @@ test("a custom recommendation submits into the same handoff", async ({ page }) =
   await cards.nth(0).getByRole("radio").check();
   await expect(customHeading).toBeVisible();
   await expect(
-    page.getByText("The Grokbot handoff stays on R-CUSTOM until you submit again."),
+    page.getByText("Jev's placement stays on R-CUSTOM until you submit again."),
   ).toBeVisible();
 
   await submit.click();
   const systemHeading = page.getByRole("heading", {
-    name: `6. Hand ${systemId} to Grokbot`,
+    name: `6. Ask Jev to place ${systemId}`,
   });
   await expect(systemHeading).toBeVisible();
   await expect(customHeading).toHaveCount(0);
@@ -197,7 +199,7 @@ test("a custom recommendation submits into the same handoff", async ({ page }) =
   await expect(systemHeading).toBeVisible();
   await expect(
     page.getByText(
-      `The Grokbot handoff stays on ${systemId} until you submit again.`,
+      `Jev's placement stays on ${systemId} until you submit again.`,
     ),
   ).toBeVisible();
 

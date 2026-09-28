@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { fetchGrokbotHandoff, type GrokbotHandoffText } from "../lib/api";
 import type { HandoffRecommendation } from "../lib/customRecommendation";
+import type { AgentBlueprint } from "../lib/types";
 import Spinner from "./Spinner";
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
   roleName: string;
   roleId?: string | null;
   tools: string[];
+  blueprint: AgentBlueprint;
 }
 
 function copyWithSelection(value: string): boolean {
@@ -56,6 +58,7 @@ export default function GrokbotHandoff({
   roleName,
   roleId,
   tools,
+  blueprint,
 }: Props) {
   const [handoff, setHandoff] = useState<GrokbotHandoffText | null>(null);
   const [loading, setLoading] = useState(true);
@@ -76,6 +79,7 @@ export default function GrokbotHandoff({
       role_name: roleName,
       role_id: roleId,
       tools,
+      blueprint,
     })
       .then((next) => {
         if (!cancelled) setHandoff(next);
@@ -102,6 +106,7 @@ export default function GrokbotHandoff({
     roleName,
     roleId,
     toolKey,
+    blueprint,
   ]);
 
   const onCopy = (label: string, value: string) => {
@@ -146,9 +151,9 @@ export default function GrokbotHandoff({
   return (
     <div className="space-y-4 rounded-lg border border-neutral-300 bg-white p-4">
       <p className="text-sm text-neutral-700">
-        Enable AI does not call {toolLabel}, and it does not create or edit
-        the bot. Finish this in Grok Bot: paste the assignment, and that bot
-        does the work.
+        Agent Architect produced the blueprint for {toolLabel}. Jev only decides
+        whether to place it on an existing bot or a new one. Copy-paste works
+        without a Grok Bot gateway; an optional configured webhook can also send it.
       </p>
       {handoff && (
         <p
@@ -180,7 +185,14 @@ export default function GrokbotHandoff({
         </p>
       )}
       <div>
-        <h3 className="text-sm font-semibold text-neutral-900">Next steps</h3>
+        <h3 className="text-base font-semibold text-neutral-900">
+          7. Build from the Agent Blueprint
+        </h3>
+        <p className="mt-1 text-sm text-neutral-600">
+          Jev places the work. Grok Bot builds or extends the teammate from the
+          architecture, supervision plan, and build targets below.
+        </p>
+        <h4 className="mt-3 text-sm font-semibold text-neutral-900">Next steps</h4>
         <ol className="mt-1 list-decimal space-y-1 pl-5 text-sm text-neutral-700">
           {steps.map((step) => (
             <li key={step}>{step}</li>
