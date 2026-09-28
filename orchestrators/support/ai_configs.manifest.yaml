@@ -8,8 +8,9 @@ ai_config:
   description: |
     Runtime configuration for Serenia & Co.'s customer support orchestrator.
     The v1-baseline variation is the working prompt; v2-detailed-responses
-    is the prompt designed to demonstrate the hallucination regression the
-    multi-signal guardrails tutorial catches.
+    is the prompt designed to demonstrate verbose over-explaining. The
+    response_conciseness judge is the quality signal the multi-signal
+    guardrails tutorial uses to catch that regression.
 
   variations:
     - name: v1-baseline
@@ -37,8 +38,16 @@ judges:
       Grades responses on factual accuracy against Serenia's policy
       documentation. Attached in the LaunchDarkly UI; LaunchDarkly
       auto-generates the support.judge.factual_accuracy metric.
+  - name: response_conciseness
+    prompt_file: judges/response_conciseness.md
+    description: |
+      Grades responses for concise, relevant helpfulness — penalizing
+      verbose over-explaining while keeping necessary policy facts.
+      Attached in the LaunchDarkly UI; LaunchDarkly auto-generates the
+      support.judge.response_conciseness metric.
 
 metrics_referenced:
   - support.errors.count
   - support.escalation_rate
   - support.judge.factual_accuracy
+  - support.judge.response_conciseness

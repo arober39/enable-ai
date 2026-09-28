@@ -106,6 +106,7 @@ _EXPECTED_FILES: list[str] = [
     "prompts/v1_baseline.md",
     "prompts/v2_detailed_responses.md",
     "judges/factual_accuracy.md",
+    "judges/response_conciseness.md",
     ".mcp.json",
     "mcp_servers/hubspot/__init__.py",
     "mcp_servers/hubspot/server.py",
@@ -208,6 +209,9 @@ def test_ai_configs_manifest_pins_tutorial_constants(tmp_path: Path) -> None:
         "mode: completion",
         "v1-baseline",
         "v2-detailed-responses",
+        "response_conciseness",
+        "support.judge.response_conciseness",
+        "verbose over-explaining",
     ]:
         assert needle in manifest, f"manifest missing: {needle}"
 
