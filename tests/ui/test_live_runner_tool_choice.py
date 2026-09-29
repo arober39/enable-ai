@@ -102,6 +102,7 @@ class _Tracker:
     def __init__(self) -> None:
         self.calls = 0
         self.metrics_calls = 0
+        self.judge_results: list[Any] = []
 
     async def track_metrics_of_async(self, metrics_fn: Any, create_fn: Any) -> Any:
         self.calls += 1
@@ -109,6 +110,32 @@ class _Tracker:
         metrics_fn(response)
         self.metrics_calls += 1
         return response
+
+    def track_judge_result(self, judge_result: Any) -> None:
+        self.judge_results.append(judge_result)
+
+
+class _Judge:
+    def __init__(self, result: Any = None, *, fail: bool = False) -> None:
+        self.result = {"score": 0.9, "metric_key": "$ld:ai:judge:test"} if result is None else result
+        self.fail = fail
+        self.calls: list[tuple[str, str]] = []
+
+    async def evaluate(self, prompt: str, response: str) -> Any:
+        self.calls.append((prompt, response))
+        if self.fail:
+            raise RuntimeError("judge failed")
+        return self.result
+
+
+class _AIClient:
+    def __init__(self, judge: _Judge) -> None:
+        self.judge = judge
+        self.calls: list[tuple[str, Any]] = []
+
+    def create_judge(self, key: str, context: Any) -> _Judge:
+        self.calls.append((key, context))
+        return self.judge
 
 
 def _clear_model_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -306,9 +333,12 @@ async def test_live_runner_uses_ld_tracker_when_available(
         "ui.api.live_runner._resolve_ld_tracking",
         lambda *_args, **_kwargs: _LDTrackingState(
             tracker=tracker,
+            ai_client=None,
+            context=None,
             model=None,
             system_prompt=None,
             params={},
+            judges=[],
             config_key="agent-architect-config",
             variation_name="filming",
         ),
@@ -319,3 +349,66 @@ async def test_live_runner_uses_ld_tracker_when_available(
 
     assert tracker.calls == 1
     assert tracker.metrics_calls == 1
+
+
+async def test_live_runner_tracks_judge_result_when_attached(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_model_env(monkeypatch)
+    tracker = _Tracker()
+    judge = _Judge(result={"metric_key": "$ld:ai:judge:blueprint-fixes-friction-constraints", "score": 1.0})
+    ai_client = _AIClient(judge)
+    monkeypatch.setattr("ui.api.live_runner.random.random", lambda: 0.0)
+    monkeypatch.setattr(
+        "ui.api.live_runner._resolve_ld_tracking",
+        lambda *_args, **_kwargs: _LDTrackingState(
+            tracker=tracker,
+            ai_client=ai_client,
+            context={"kind": "request"},
+            model=None,
+            system_prompt=None,
+            params={},
+            judges=[("blueprint-fixes-friction-constraints", 1.0)],
+            config_key="agent-architect-config",
+            variation_name="filming",
+        ),
+    )
+    client = _Client([_Response([_tool_use()], stop_reason="tool_use")])
+
+    await _run(monkeypatch, client)
+
+    assert len(ai_client.calls) == 1
+    assert ai_client.calls[0][0] == "blueprint-fixes-friction-constraints"
+    assert len(judge.calls) == 1
+    assert len(tracker.judge_results) == 1
+    assert tracker.judge_results[0]["metric_key"] == "$ld:ai:judge:blueprint-fixes-friction-constraints"
+
+
+async def test_live_runner_judge_failure_does_not_fail_plan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_model_env(monkeypatch)
+    tracker = _Tracker()
+    ai_client = _AIClient(_Judge(fail=True))
+    monkeypatch.setattr("ui.api.live_runner.random.random", lambda: 0.0)
+    monkeypatch.setattr(
+        "ui.api.live_runner._resolve_ld_tracking",
+        lambda *_args, **_kwargs: _LDTrackingState(
+            tracker=tracker,
+            ai_client=ai_client,
+            context={"kind": "request"},
+            model=None,
+            system_prompt=None,
+            params={},
+            judges=[("blueprint-fixes-friction-constraints", 1.0)],
+            config_key="agent-architect-config",
+            variation_name="filming",
+        ),
+    )
+    client = _Client([_Response([_tool_use()], stop_reason="tool_use")])
+
+    plan = await _run(monkeypatch, client)
+
+    assert isinstance(plan, EnablementPlan)
+    assert len(ai_client.calls) == 1
+    assert tracker.judge_results == []

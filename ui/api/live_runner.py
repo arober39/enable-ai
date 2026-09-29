@@ -37,6 +37,8 @@ import json
 import logging
 import os
 import atexit
+import inspect
+import random
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -61,7 +63,7 @@ _REPO_ROOT: Path = Path(__file__).resolve().parents[2]
 #: the shared planner model (Opus 5.5, or ENABLEMENT_AGENT_MODEL).
 _UI_LIVE_MODEL_ENV = "UI_LIVE_MODEL"
 _ARCHITECT_AI_CONFIG_KEY_ENV = "AGENT_ARCHITECT_AI_CONFIG_KEY"
-# Filming default: attach judge key `friction-addressing-blueprint-fit`
+# Filming default: attach judge key `blueprint-fixes-friction-constraints`
 # to completion-mode config key `agent-architect-config`.
 _DEFAULT_ARCHITECT_AI_CONFIG_KEY = "agent-architect-config"
 _SUBMIT_TOOL_NAME = "submit_enablement_plan"
@@ -139,9 +141,12 @@ _TRACKING_CLIENTS = _LiveTrackingClients()
 @dataclass(frozen=True)
 class _LDTrackingState:
     tracker: Any
+    ai_client: Any
+    context: Any
     model: str | None
     system_prompt: str | None
     params: dict[str, Any]
+    judges: list[tuple[str, float | None]]
     config_key: str
     variation_name: str | None
 
@@ -257,13 +262,24 @@ def _resolve_ld_tracking(
             if getattr(config, "model", None) is not None and hasattr(config.model, "to_dict")
             else {}
         ) or {}
+        judges = [
+            (judge.key, judge.sampling_rate)
+            for judge in (
+                config.judge_configuration.judges
+                if getattr(config, "judge_configuration", None) is not None
+                else []
+            )
+        ]
         meta = config.to_dict().get("_ldMeta", {}) if hasattr(config, "to_dict") else {}
         variation = meta.get("variationKey")
         return _LDTrackingState(
             tracker=config.create_tracker(),
+            ai_client=ai_client,
+            context=ld_context,
             model=model,
             system_prompt=system_prompt,
             params=_anthropic_create_params(dict(raw_params)),
+            judges=judges,
             config_key=config_key,
             variation_name=variation if isinstance(variation, str) else None,
         )
@@ -663,6 +679,79 @@ def _no_tool_use_error(response: Any) -> RuntimeError:
     )
 
 
+def _sampled(sampling_rate: float | None) -> bool:
+    """Return whether this judge evaluation should run for the request."""
+    rate = 1.0 if sampling_rate is None else float(sampling_rate)
+    if rate <= 0:
+        return False
+    if rate >= 1:
+        return True
+    return random.random() <= rate
+
+
+async def _evaluate_one_judge(
+    *, judge: Any, evaluation_input: str, evaluation_output: str
+) -> Any:
+    """Call a judge runner's evaluate method across known signatures."""
+    evaluate = getattr(judge, "evaluate", None)
+    if not callable(evaluate):
+        raise RuntimeError("judge has no evaluate() method")
+
+    attempts: tuple[tuple[tuple[Any, ...], dict[str, Any]], ...] = (
+        ((evaluation_input, evaluation_output), {}),
+        ((), {"input": evaluation_input, "output": evaluation_output}),
+        ((), {"prompt": evaluation_input, "response": evaluation_output}),
+        (({"input": evaluation_input, "output": evaluation_output},), {}),
+    )
+    last_error: Exception | None = None
+    for args, kwargs in attempts:
+        try:
+            result = evaluate(*args, **kwargs)
+            if inspect.isawaitable(result):
+                return await result
+            return result
+        except TypeError as exc:
+            last_error = exc
+            continue
+    raise RuntimeError(f"judge evaluate call failed for known signatures: {last_error}")
+
+
+async def _run_online_judges(
+    tracking: _LDTrackingState,
+    *,
+    evaluation_input: str,
+    evaluation_output: str,
+) -> None:
+    """Evaluate attached online judges and track their outcomes.
+
+    Errors are logged and swallowed so blueprint generation never fails.
+    """
+    if tracking.tracker is None or tracking.ai_client is None or not tracking.judges:
+        return
+
+    for judge_key, sampling_rate in tracking.judges:
+        if not _sampled(sampling_rate):
+            continue
+        try:
+            create_judge = getattr(tracking.ai_client, "create_judge", None)
+            if not callable(create_judge):
+                logger.info(
+                    "live runner: ai client does not expose create_judge; skipping judge %s",
+                    judge_key,
+                )
+                continue
+            judge = create_judge(judge_key, tracking.context)
+            result = await _evaluate_one_judge(
+                judge=judge,
+                evaluation_input=evaluation_input,
+                evaluation_output=evaluation_output,
+            )
+            tracking.tracker.track_judge_result(result)
+        except Exception:  # noqa: BLE001 - judge telemetry must never fail live generation
+            logger.exception("live runner: judge evaluation failed key=%s", judge_key)
+            continue
+
+
 async def run_live_plan(
     tools: list[str], role: Role, user: UserContext
 ) -> EnablementPlan:
@@ -822,4 +911,14 @@ async def run_live_plan(
         cap = load_tool(user, tool_name)
         if cap is not None:
             loaded.append(cap)
-    return apply_tool_grounding(plan, loaded, role)
+    grounded_plan = apply_tool_grounding(plan, loaded, role)
+
+    # For custom Anthropic tool_use pipelines, attached online judges do not
+    # auto-run from track_metrics_of_async; invoke them explicitly here.
+    if tracking is not None:
+        await _run_online_judges(
+            tracking,
+            evaluation_input=user_message,
+            evaluation_output=json.dumps(grounded_plan.model_dump(mode="json"), sort_keys=True),
+        )
+    return grounded_plan

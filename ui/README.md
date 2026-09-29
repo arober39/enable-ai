@@ -77,7 +77,7 @@ Use this when you want Monitoring rows from real Architect runs:
    - `LAUNCHDARKLY_SDK_KEY=...`
 2. In LaunchDarkly, create/use completion-mode AgentControl config key:
    - `agent-architect-config` (or set `AGENT_ARCHITECT_AI_CONFIG_KEY` to your override)
-3. Attach judge **`friction-addressing-blueprint-fit`** to that config variation and set sampling to **100%** for demos.
+3. Attach judge **`blueprint-fixes-friction-constraints`** to that config variation and set sampling to **100%** for demos.
 4. Run the UI flow (role + tools + friction → Run). A few live runs should appear in Monitoring within a couple of minutes.
 
 If `LAUNCHDARKLY_SDK_KEY` is missing, live mode still returns a blueprint and logs that eval tracking was skipped.
