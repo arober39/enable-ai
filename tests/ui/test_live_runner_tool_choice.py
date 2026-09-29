@@ -12,6 +12,7 @@ from core.identity import UserContext
 from core.roles import load_role
 from enablement_agents.role_agent import ENABLEMENT_AGENT_MODEL_ENV
 from ui.api.live_runner import (
+    _LDTrackingState,
     _live_plan_request_shape,
     _model_rejects_forced_tool_choice,
     _schema_allows_strict_tool,
@@ -95,6 +96,19 @@ class _Messages:
 class _Client:
     def __init__(self, responses: list[_Response]) -> None:
         self.messages = _Messages(responses)
+
+
+class _Tracker:
+    def __init__(self) -> None:
+        self.calls = 0
+        self.metrics_calls = 0
+
+    async def track_metrics_of_async(self, metrics_fn: Any, create_fn: Any) -> Any:
+        self.calls += 1
+        response = await create_fn()
+        metrics_fn(response)
+        self.metrics_calls += 1
+        return response
 
 
 def _clear_model_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -281,3 +295,27 @@ async def test_sonnet_no_tool_use_does_not_retry(
         await _run(monkeypatch, client)
 
     assert len(client.messages.calls) == 1
+
+
+async def test_live_runner_uses_ld_tracker_when_available(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_model_env(monkeypatch)
+    tracker = _Tracker()
+    monkeypatch.setattr(
+        "ui.api.live_runner._resolve_ld_tracking",
+        lambda *_args, **_kwargs: _LDTrackingState(
+            tracker=tracker,
+            model=None,
+            system_prompt=None,
+            params={},
+            config_key="agent-architect-config",
+            variation_name="filming",
+        ),
+    )
+    client = _Client([_Response([_tool_use()], stop_reason="tool_use")])
+
+    await _run(monkeypatch, client)
+
+    assert tracker.calls == 1
+    assert tracker.metrics_calls == 1

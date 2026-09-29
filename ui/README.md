@@ -65,7 +65,22 @@ The backend honors the same `ENABLE_AI_DEMO_MODE` env var as the rest of the sys
 | Mode | When | What happens |
 |---|---|---|
 | **Demo** (default) | `ENABLE_AI_DEMO_MODE=true` *or* `ANTHROPIC_API_KEY` unset | The backend returns a synthetic catalog-driven plan. No LLM cost. The UI labels the plan `demo mode`. Useful for testing the surface itself. |
-| **Live** | `ENABLE_AI_DEMO_MODE=false` AND `ANTHROPIC_API_KEY` set | The backend calls Anthropic's API directly via `anthropic.AsyncAnthropic()`, using Pydantic-generated JSON Schema as a `tool_use` input schema. Each run costs a few cents in LLM tokens. |
+| **Live** | `ENABLE_AI_DEMO_MODE=false` AND `ANTHROPIC_API_KEY` set | The backend calls Anthropic's API directly via `anthropic.AsyncAnthropic()`, using Pydantic-generated JSON Schema as a `tool_use` input schema. When `LAUNCHDARKLY_SDK_KEY` is also set, it fetches completion-mode AI Config `agent-architect-config` (or `AGENT_ARCHITECT_AI_CONFIG_KEY`) and records generation metrics through the LaunchDarkly AI SDK tracker so attached online judges can score outputs. |
+
+### LaunchDarkly online eval setup (for filming)
+
+Use this when you want Monitoring rows from real Architect runs:
+
+1. Set env vars before starting the backend:
+   - `ENABLE_AI_DEMO_MODE=false`
+   - `ANTHROPIC_API_KEY=...`
+   - `LAUNCHDARKLY_SDK_KEY=...`
+2. In LaunchDarkly, create/use completion-mode AgentControl config key:
+   - `agent-architect-config` (or set `AGENT_ARCHITECT_AI_CONFIG_KEY` to your override)
+3. Attach judge **`friction-addressing-blueprint-fit`** to that config variation and set sampling to **100%** for demos.
+4. Run the UI flow (role + tools + friction → Run). A few live runs should appear in Monitoring within a couple of minutes.
+
+If `LAUNCHDARKLY_SDK_KEY` is missing, live mode still returns a blueprint and logs that eval tracking was skipped.
 
 ### Architectural deviation — UI live mode does NOT use `claude-agent-sdk`
 

@@ -36,6 +36,7 @@ import hashlib
 import json
 import logging
 import os
+import atexit
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -59,6 +60,10 @@ _REPO_ROOT: Path = Path(__file__).resolve().parents[2]
 #: ENABLEMENT_AGENT_MODEL for this module only. Unset, the live plan uses
 #: the shared planner model (Opus 5.5, or ENABLEMENT_AGENT_MODEL).
 _UI_LIVE_MODEL_ENV = "UI_LIVE_MODEL"
+_ARCHITECT_AI_CONFIG_KEY_ENV = "AGENT_ARCHITECT_AI_CONFIG_KEY"
+# Filming default: attach judge key `friction-addressing-blueprint-fit`
+# to completion-mode config key `agent-architect-config`.
+_DEFAULT_ARCHITECT_AI_CONFIG_KEY = "agent-architect-config"
 _SUBMIT_TOOL_NAME = "submit_enablement_plan"
 
 #: Ceiling for models that do not spend output tokens on adaptive thinking.
@@ -107,6 +112,166 @@ _STRICT_UNSUPPORTED_KEYS = frozenset(
         "pattern",
     }
 )
+
+_ANTHROPIC_PARAM_ALIASES = {
+    "maxTokens": "max_tokens",
+    "topP": "top_p",
+    "topK": "top_k",
+    "stopSequences": "stop_sequences",
+}
+_ANTHROPIC_PARAM_KEYS = {
+    "max_tokens",
+    "temperature",
+    "top_p",
+    "top_k",
+    "stop_sequences",
+}
+
+
+class _LiveTrackingClients:
+    ld: Any = None
+    ai: Any = None
+
+
+_TRACKING_CLIENTS = _LiveTrackingClients()
+
+
+@dataclass(frozen=True)
+class _LDTrackingState:
+    tracker: Any
+    model: str | None
+    system_prompt: str | None
+    params: dict[str, Any]
+    config_key: str
+    variation_name: str | None
+
+
+def _resolve_architect_config_key() -> str:
+    """AI Config key used for Architect live-run tracking.
+
+    Keep this explicit for filming and docs:
+      - default key: ``agent-architect-config``
+      - optional override: ``AGENT_ARCHITECT_AI_CONFIG_KEY``
+    """
+    override = os.environ.get(_ARCHITECT_AI_CONFIG_KEY_ENV, "").strip()
+    return override or _DEFAULT_ARCHITECT_AI_CONFIG_KEY
+
+
+def _ld_clients() -> tuple[Any, Any]:
+    """Return shared (LDClient, LDAIClient), created once per process."""
+    if _TRACKING_CLIENTS.ld is None:
+        from ldai import LDAIClient  # type: ignore[import-untyped]
+        from ldclient import LDClient
+        from ldclient.config import Config as LDConfig
+
+        sdk_key = os.environ.get("LAUNCHDARKLY_SDK_KEY", "").strip()
+        client = LDClient(LDConfig(sdk_key=sdk_key))
+        _TRACKING_CLIENTS.ld = client
+        _TRACKING_CLIENTS.ai = LDAIClient(client)
+        atexit.register(client.close)
+    return _TRACKING_CLIENTS.ld, _TRACKING_CLIENTS.ai
+
+
+def _anthropic_metrics(response: Any) -> Any:
+    """Map an Anthropic response to LDAIMetrics for tracker recording."""
+    from ldai.providers import LDAIMetrics  # type: ignore[import-untyped]
+    from ldai.tracker import TokenUsage  # type: ignore[import-untyped]
+
+    usage = getattr(response, "usage", None)
+    input_tokens = int(getattr(usage, "input_tokens", 0) or 0)
+    output_tokens = int(getattr(usage, "output_tokens", 0) or 0)
+    return LDAIMetrics(
+        success=True,
+        tokens=TokenUsage(
+            total=input_tokens + output_tokens,
+            input=input_tokens,
+            output=output_tokens,
+        ),
+    )
+
+
+def _anthropic_create_params(raw_params: dict[str, Any]) -> dict[str, Any]:
+    """Translate AgentControl model parameters into Anthropic kwargs."""
+    out: dict[str, Any] = {}
+    for key, value in raw_params.items():
+        mapped = _ANTHROPIC_PARAM_ALIASES.get(key, key)
+        if mapped in _ANTHROPIC_PARAM_KEYS and value is not None:
+            out[mapped] = value
+    return out
+
+
+def _resolve_ld_tracking(
+    session_id: str, default_system_prompt: str, default_model: str
+) -> _LDTrackingState | None:
+    """Fetch AI Config + tracker for Architect live runs.
+
+    Returns None when eval tracking is unavailable (demo mode, missing key,
+    config disabled/unreachable). Generation should continue in that case.
+    """
+    raw_demo = os.environ.get("ENABLE_AI_DEMO_MODE", "true").strip().lower()
+    if raw_demo in {"1", "true", "yes", "on"}:
+        return None
+
+    if not os.environ.get("LAUNCHDARKLY_SDK_KEY", "").strip():
+        logger.info(
+            "live runner: LaunchDarkly tracking skipped; LAUNCHDARKLY_SDK_KEY is unset"
+        )
+        return None
+
+    config_key = _resolve_architect_config_key()
+    try:
+        from ldclient import Context
+
+        _ld_client, ai_client = _ld_clients()
+        ld_context = Context.builder(session_id).kind("request").build()
+        config = ai_client.completion_config(config_key, ld_context, default=None)
+
+        if not getattr(config, "enabled", False):
+            logger.info(
+                "live runner: LaunchDarkly config %s disabled; eval tracking skipped",
+                config_key,
+            )
+            return None
+
+        config_messages = config.messages or []
+        ld_system_prompt = next(
+            (
+                msg.content
+                for msg in config_messages
+                if getattr(msg, "role", None) == "system" and getattr(msg, "content", None)
+            ),
+            "",
+        ).strip()
+        system_prompt = (
+            f"{ld_system_prompt}\n\n{default_system_prompt}"
+            if ld_system_prompt
+            else default_system_prompt
+        )
+        model = (
+            config.model.name
+            if getattr(config, "model", None) is not None and getattr(config.model, "name", None)
+            else default_model
+        )
+        raw_params = (
+            config.model.to_dict().get("parameters")
+            if getattr(config, "model", None) is not None and hasattr(config.model, "to_dict")
+            else {}
+        ) or {}
+        meta = config.to_dict().get("_ldMeta", {}) if hasattr(config, "to_dict") else {}
+        variation = meta.get("variationKey")
+        return _LDTrackingState(
+            tracker=config.create_tracker(),
+            model=model,
+            system_prompt=system_prompt,
+            params=_anthropic_create_params(dict(raw_params)),
+            config_key=config_key,
+            variation_name=variation if isinstance(variation, str) else None,
+        )
+    except Exception:  # noqa: BLE001 - tracking must not block live generation
+        logger.exception(
+            "live runner: LaunchDarkly tracking unavailable; proceeding without eval telemetry"
+        )
+        return None
 
 
 def resolve_live_plan_model() -> str:
@@ -537,9 +702,14 @@ async def run_live_plan(
 
     client = AsyncAnthropic()
     model = resolve_live_plan_model()
+    tracking = _resolve_ld_tracking(session_id, system_prompt, model)
+    if tracking is not None:
+        model = tracking.model or model
+        system_prompt = tracking.system_prompt or system_prompt
+
     shape = _live_plan_request_shape(model, plan_schema)
     logger.info(
-        "live runner: model=%s tool_choice=%s strict=%s max_tokens=%s role=%s tools=%s session=%s",
+        "live runner: model=%s tool_choice=%s strict=%s max_tokens=%s role=%s tools=%s session=%s ai_config=%s variation=%s tracking=%s",
         model,
         shape.tool_choice.get("type"),
         shape.strict,
@@ -547,6 +717,9 @@ async def run_live_plan(
         role.id,
         tools,
         session_id,
+        tracking.config_key if tracking is not None else None,
+        tracking.variation_name if tracking is not None else None,
+        tracking is not None,
     )
 
     tool_def: dict[str, Any] = {
@@ -574,6 +747,8 @@ async def run_live_plan(
     }
     if shape.output_config is not None:
         create_kwargs["output_config"] = shape.output_config
+    if tracking is not None and tracking.params:
+        create_kwargs.update(tracking.params)
 
     # Automatic tool choice does not guarantee a call. One follow-up echoes
     # the assistant turn unchanged (thinking blocks included) and asks again.
@@ -582,10 +757,19 @@ async def run_live_plan(
     response: Any = None
     tool_uses: list[ToolUseBlock] = []
     for attempt in range(attempts):
-        response = await client.messages.create(
-            **create_kwargs,
-            messages=list(messages),
-        )
+        async def _create() -> Any:
+            return await client.messages.create(
+                **create_kwargs,
+                messages=list(messages),
+            )
+
+        if tracking is not None and tracking.tracker is not None:
+            response = await tracking.tracker.track_metrics_of_async(
+                _anthropic_metrics,
+                _create,
+            )
+        else:
+            response = await _create()
         tool_uses = [
             block for block in response.content if isinstance(block, ToolUseBlock)
         ]

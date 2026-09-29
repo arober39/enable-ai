@@ -162,3 +162,19 @@ def test_enablement_response_includes_the_blueprint(client: TestClient) -> None:
     assert "Release notes are copied by hand." in body["blueprint"]["pain_points"]
     relationship = " ".join(body["blueprint"]["agent_responsibilities"])
     assert "GitHub" in relationship and "Discord" in relationship
+
+
+def test_demo_mode_skips_live_runner(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    def _boom(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("live runner should not run in demo mode")
+
+    monkeypatch.setattr("ui.api.server.run_live_plan", _boom)
+    response = client.post(
+        "/api/enablement",
+        json={
+            "tools": ["github", "discord"],
+            "role": "devrel",
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["mode"] == "demo"
