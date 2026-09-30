@@ -48,6 +48,7 @@ from anthropic import AsyncAnthropic
 from anthropic.types import ToolUseBlock
 
 from coordinator.schemas import EnablementPlan
+from core.agent_architect import TaskSelection
 from core.identity import UserContext
 from core.plan_grounding import CROSS_TOOL_PLAN_INSTRUCTIONS, apply_tool_grounding
 from core.roles import Role
@@ -490,11 +491,27 @@ def _gather_catalog_context(tools: list[str], user: UserContext) -> str:
 
 
 def _build_user_message(
-    tools: list[str], session_id: str, role: Role, user: UserContext
+    tools: list[str],
+    session_id: str,
+    role: Role,
+    user: UserContext,
+    *,
+    friction: str,
+    tasks: list[TaskSelection] | None,
 ) -> str:
     """Compose the single user-message that drives the run."""
     catalog_context = _gather_catalog_context(tools, user)
     role_lower = role.display_name.lower()
+    friction_text = friction.strip()
+    selected_tasks = tasks or []
+    if selected_tasks:
+        task_lines = "\n".join(
+            f"- {task.label} ({task.id}, source={task.source})"
+            for task in selected_tasks
+        )
+    else:
+        task_lines = "- none provided"
+    friction_block = friction_text if friction_text else "None provided."
     return f"""\
 You are Agent Architect, compiling a blueprint for a {role.display_name}.
 
@@ -503,6 +520,14 @@ Your task: produce a structured EnablementPlan for the tools listed below, for a
 ## Selected tool ids
 
 {", ".join(tools)}
+
+## User-stated friction
+
+{friction_block}
+
+## User-confirmed tasks
+
+{task_lines}
 
 These ids are the only tools in this run. A previous plan for this role is not an input. Do not reuse its themes.
 
@@ -775,7 +800,12 @@ async def _run_online_judges(
 
 
 async def run_live_plan(
-    tools: list[str], role: Role, user: UserContext
+    tools: list[str],
+    role: Role,
+    user: UserContext,
+    *,
+    friction: str = "",
+    tasks: list[TaskSelection] | None = None,
 ) -> EnablementPlan:
     """Generate an EnablementPlan via direct Anthropic API call.
 
@@ -803,7 +833,14 @@ async def run_live_plan(
 
     session_id = f"ui-live-{datetime.now(UTC).timestamp():.0f}"
     system_prompt = _build_system_prompt(role)
-    user_message = _build_user_message(tools, session_id, role, user)
+    user_message = _build_user_message(
+        tools,
+        session_id,
+        role,
+        user,
+        friction=friction,
+        tasks=tasks,
+    )
 
     # The tool's input_schema is the EnablementPlan JSON Schema. Opus 5.5
     # marks the tool strict when that schema meets Anthropic's subset, so

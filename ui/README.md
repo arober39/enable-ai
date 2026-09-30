@@ -83,6 +83,7 @@ Use this when you want Monitoring rows from real Architect runs:
    - `agent-architect-config` (or set `AGENT_ARCHITECT_AI_CONFIG_KEY` to your override)
 3. Attach judge **`blueprint-fixes-friction-constraints`** to that config variation and set sampling to **100%** for demos.
 4. Run the UI flow (role + tools + friction → Run). A few live runs should appear in Monitoring within a couple of minutes.
+   - The friction field now accepts up to 8000 characters for longer real-world context.
 
 If `LAUNCHDARKLY_SDK_KEY` is missing, live mode still returns a blueprint and logs that eval tracking was skipped.
 If judge provider packages are missing, the run still returns a blueprint and logs a warning that judge evaluation was skipped.

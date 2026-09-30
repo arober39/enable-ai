@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 from anthropic.types import TextBlock, ThinkingBlock, ToolUseBlock
 
+from core.agent_architect import TaskSelection
 from coordinator.schemas import EnablementPlan
 from core.identity import UserContext
 from core.roles import load_role
@@ -152,10 +153,22 @@ def _assert_no_sampling(call: dict[str, Any]) -> None:
         assert key not in call
 
 
-async def _run(monkeypatch: pytest.MonkeyPatch, client: _Client) -> Any:
+async def _run(
+    monkeypatch: pytest.MonkeyPatch,
+    client: _Client,
+    *,
+    friction: str = "",
+    tasks: list[TaskSelection] | None = None,
+) -> Any:
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     monkeypatch.setattr("ui.api.live_runner.AsyncAnthropic", lambda: client)
-    return await run_live_plan(["intercom"], load_role("support"), UserContext(user_id="local"))
+    return await run_live_plan(
+        ["intercom"],
+        load_role("support"),
+        UserContext(user_id="local"),
+        friction=friction,
+        tasks=tasks,
+    )
 
 
 def test_opus_55_ids_reject_forced_tool_choice() -> None:
@@ -476,3 +489,75 @@ async def test_live_runner_judge_without_evaluate_is_skipped_without_failure(
     assert isinstance(plan, EnablementPlan)
     assert len(ai_client.calls) == 1
     assert tracker.judge_results == []
+
+
+async def test_user_message_includes_friction_and_tasks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_model_env(monkeypatch)
+    client = _Client([_Response([_tool_use()], stop_reason="tool_use")])
+    friction = "My biggest friction is reentering data across platforms."
+    tasks = [
+        TaskSelection(
+            id="escalation-handoff",
+            label="Escalation handoff",
+            source="actual",
+        )
+    ]
+
+    await _run(monkeypatch, client, friction=friction, tasks=tasks)
+
+    message = client.messages.calls[0]["messages"][0]["content"]
+    assert "## User-stated friction" in message
+    assert friction in message
+    assert "## User-confirmed tasks" in message
+    assert "Escalation handoff (escalation-handoff, source=actual)" in message
+
+
+async def test_judge_evaluate_input_contains_friction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_model_env(monkeypatch)
+    tracker = _Tracker()
+    judge = _Judge(
+        result={
+            "metric_key": "$ld:ai:judge:blueprint-fixes-friction-constraints",
+            "score": 1.0,
+        }
+    )
+    ai_client = _AIClient(judge)
+    monkeypatch.setattr("ui.api.live_runner.random.random", lambda: 0.0)
+    monkeypatch.setattr(
+        "ui.api.live_runner._resolve_ld_tracking",
+        lambda *_args, **_kwargs: _LDTrackingState(
+            tracker=tracker,
+            ai_client=ai_client,
+            context={"kind": "request"},
+            model=None,
+            system_prompt=None,
+            params={},
+            judges=[("blueprint-fixes-friction-constraints", 1.0)],
+            config_key="agent-architect-config",
+            variation_name="filming",
+        ),
+    )
+    client = _Client([_Response([_tool_use()], stop_reason="tool_use")])
+    friction = "Escalations lose commercial context between systems."
+
+    await _run(monkeypatch, client, friction=friction)
+
+    assert len(judge.calls) == 1
+    assert friction in judge.calls[0][0]
+
+
+async def test_user_message_handles_empty_friction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_model_env(monkeypatch)
+    client = _Client([_Response([_tool_use()], stop_reason="tool_use")])
+
+    await _run(monkeypatch, client, friction="")
+
+    message = client.messages.calls[0]["messages"][0]["content"]
+    assert "## User-stated friction" in message
+    assert "None provided." in message

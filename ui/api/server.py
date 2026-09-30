@@ -243,7 +243,7 @@ class EnablementRequest(BaseModel):
     )
     friction: str = Field(
         default="",
-        max_length=2000,
+        max_length=8000,
         description="Where the work gets stuck, in the person's words.",
     )
 
@@ -451,7 +451,13 @@ async def run_enablement(req: EnablementRequest) -> EnablementResponse:
         req.tools,
     )
     try:
-        plan = await run_live_plan(req.tools, role, user)
+        plan = await run_live_plan(
+            req.tools,
+            role,
+            user,
+            friction=req.friction,
+            tasks=req.tasks,
+        )
     except Exception as exc:  # noqa: BLE001 — turn any agent error into a 502 with the real message
         logger.exception(
             "live runner failed role=%s tools=%s",
