@@ -129,13 +129,17 @@ class _Judge:
 
 
 class _AIClient:
-    def __init__(self, judge: _Judge) -> None:
+    def __init__(self, judge: Any) -> None:
         self.judge = judge
         self.calls: list[tuple[str, Any]] = []
 
-    def create_judge(self, key: str, context: Any) -> _Judge:
+    def create_judge(self, key: str, context: Any) -> Any:
         self.calls.append((key, context))
         return self.judge
+
+
+class _JudgeNoEvaluate:
+    pass
 
 
 def _clear_model_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -390,6 +394,66 @@ async def test_live_runner_judge_failure_does_not_fail_plan(
     _clear_model_env(monkeypatch)
     tracker = _Tracker()
     ai_client = _AIClient(_Judge(fail=True))
+    monkeypatch.setattr("ui.api.live_runner.random.random", lambda: 0.0)
+    monkeypatch.setattr(
+        "ui.api.live_runner._resolve_ld_tracking",
+        lambda *_args, **_kwargs: _LDTrackingState(
+            tracker=tracker,
+            ai_client=ai_client,
+            context={"kind": "request"},
+            model=None,
+            system_prompt=None,
+            params={},
+            judges=[("blueprint-fixes-friction-constraints", 1.0)],
+            config_key="agent-architect-config",
+            variation_name="filming",
+        ),
+    )
+    client = _Client([_Response([_tool_use()], stop_reason="tool_use")])
+
+    plan = await _run(monkeypatch, client)
+
+    assert isinstance(plan, EnablementPlan)
+    assert len(ai_client.calls) == 1
+    assert tracker.judge_results == []
+
+
+async def test_live_runner_none_judge_is_skipped_without_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_model_env(monkeypatch)
+    tracker = _Tracker()
+    ai_client = _AIClient(None)
+    monkeypatch.setattr("ui.api.live_runner.random.random", lambda: 0.0)
+    monkeypatch.setattr(
+        "ui.api.live_runner._resolve_ld_tracking",
+        lambda *_args, **_kwargs: _LDTrackingState(
+            tracker=tracker,
+            ai_client=ai_client,
+            context={"kind": "request"},
+            model=None,
+            system_prompt=None,
+            params={},
+            judges=[("blueprint-fixes-friction-constraints", 1.0)],
+            config_key="agent-architect-config",
+            variation_name="filming",
+        ),
+    )
+    client = _Client([_Response([_tool_use()], stop_reason="tool_use")])
+
+    plan = await _run(monkeypatch, client)
+
+    assert isinstance(plan, EnablementPlan)
+    assert len(ai_client.calls) == 1
+    assert tracker.judge_results == []
+
+
+async def test_live_runner_judge_without_evaluate_is_skipped_without_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_model_env(monkeypatch)
+    tracker = _Tracker()
+    ai_client = _AIClient(_JudgeNoEvaluate())
     monkeypatch.setattr("ui.api.live_runner.random.random", lambda: 0.0)
     monkeypatch.setattr(
         "ui.api.live_runner._resolve_ld_tracking",

@@ -71,6 +71,10 @@ The backend honors the same `ENABLE_AI_DEMO_MODE` env var as the rest of the sys
 
 Use this when you want Monitoring rows from real Architect runs:
 
+0. Install judge-provider packages in the same Python env as the backend:
+   - `launchdarkly-server-sdk-ai-langchain==0.8.0`
+   - `langchain-anthropic==1.5.1`
+   - Keep project pin `anthropic==0.101.0` (do not upgrade to 0.120+).
 1. Set env vars before starting the backend:
    - `ENABLE_AI_DEMO_MODE=false`
    - `ANTHROPIC_API_KEY=...`
@@ -81,6 +85,7 @@ Use this when you want Monitoring rows from real Architect runs:
 4. Run the UI flow (role + tools + friction → Run). A few live runs should appear in Monitoring within a couple of minutes.
 
 If `LAUNCHDARKLY_SDK_KEY` is missing, live mode still returns a blueprint and logs that eval tracking was skipped.
+If judge provider packages are missing, the run still returns a blueprint and logs a warning that judge evaluation was skipped.
 
 ### Architectural deviation — UI live mode does NOT use `claude-agent-sdk`
 

@@ -729,6 +729,11 @@ async def _run_online_judges(
     if tracking.tracker is None or tracking.ai_client is None or not tracking.judges:
         return
 
+    missing_provider_hint = (
+        "Install provider extras for online judges, e.g. "
+        "`launchdarkly-server-sdk-ai-langchain` and `langchain-anthropic`, "
+        "then restart the backend."
+    )
     for judge_key, sampling_rate in tracking.judges:
         if not _sampled(sampling_rate):
             continue
@@ -741,6 +746,23 @@ async def _run_online_judges(
                 )
                 continue
             judge = create_judge(judge_key, tracking.context)
+            if inspect.isawaitable(judge):
+                judge = await judge
+            if judge is None:
+                logger.warning(
+                    "live runner: create_judge returned None for %s; skipping. %s",
+                    judge_key,
+                    missing_provider_hint,
+                )
+                continue
+            evaluate = getattr(judge, "evaluate", None)
+            if not callable(evaluate):
+                logger.warning(
+                    "live runner: judge %s is missing evaluate(); skipping. %s",
+                    judge_key,
+                    missing_provider_hint,
+                )
+                continue
             result = await _evaluate_one_judge(
                 judge=judge,
                 evaluation_input=evaluation_input,
