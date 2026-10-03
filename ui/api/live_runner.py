@@ -32,12 +32,12 @@ Output:  a fully-validated EnablementPlan, same Pydantic shape as the
 
 from __future__ import annotations
 
+import atexit
 import hashlib
+import inspect
 import json
 import logging
 import os
-import atexit
-import inspect
 import random
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -50,7 +50,7 @@ from anthropic.types import ToolUseBlock
 from coordinator.schemas import EnablementPlan
 from core.agent_architect import TaskSelection
 from core.identity import UserContext
-from core.plan_grounding import CROSS_TOOL_PLAN_INSTRUCTIONS, apply_tool_grounding
+from core.plan_grounding import CROSS_TOOL_PLAN_INSTRUCTIONS, plan_drifts_from_tools
 from core.roles import Role
 from core.tool_catalog import ToolCapability, load_tool
 from enablement_agents.role_agent import resolve_role_agent_model
@@ -970,7 +970,15 @@ async def run_live_plan(
         cap = load_tool(user, tool_name)
         if cap is not None:
             loaded.append(cap)
-    grounded_plan = apply_tool_grounding(plan, loaded, role)
+    # Drift is a diagnostic, not permission to rewrite the model's output.
+    # Judges and downstream draft generation must see the submitted plan,
+    # including omissions or mistakes, rather than catalog template content.
+    if plan_drifts_from_tools(plan, loaded, role):
+        logger.info(
+            "live runner: submitted plan drifts from selected tools role=%s tools=%s",
+            role.id,
+            tools,
+        )
 
     # For custom Anthropic tool_use pipelines, attached online judges do not
     # auto-run from track_metrics_of_async; invoke them explicitly here.
@@ -978,6 +986,6 @@ async def run_live_plan(
         await _run_online_judges(
             tracking,
             evaluation_input=user_message,
-            evaluation_output=json.dumps(grounded_plan.model_dump(mode="json"), sort_keys=True),
+            evaluation_output=json.dumps(plan.model_dump(mode="json"), sort_keys=True),
         )
-    return grounded_plan
+    return plan

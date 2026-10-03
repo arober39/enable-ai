@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import pytest
 from anthropic.types import TextBlock, ThinkingBlock, ToolUseBlock
 
-from core.agent_architect import TaskSelection
 from coordinator.schemas import EnablementPlan
+from core.agent_architect import TaskSelection
 from core.identity import UserContext
+from core.plan_grounding import apply_tool_grounding, plan_drifts_from_tools
 from core.roles import load_role
+from core.tool_catalog import load_tool
 from enablement_agents.role_agent import ENABLEMENT_AGENT_MODEL_ENV
 from ui.api.live_runner import (
     _LDTrackingState,
@@ -561,3 +564,64 @@ async def test_user_message_handles_empty_friction(
     message = client.messages.calls[0]["messages"][0]["content"]
     assert "## User-stated friction" in message
     assert "None provided." in message
+
+
+@pytest.mark.parametrize("drifts", [False, True])
+async def test_online_judge_scores_submitted_plan_without_catalog_replacement(
+    monkeypatch: pytest.MonkeyPatch,
+    drifts: bool,
+) -> None:
+    _clear_model_env(monkeypatch)
+    role = load_role("support")
+    user = UserContext(user_id="local")
+    tools = ["intercom", "slack"]
+    capabilities = [load_tool(user, name) for name in tools]
+    assert all(cap is not None for cap in capabilities)
+    submitted = _plan_input()
+    submitted["summary"] = "Draft the next Intercom reply and send it to Slack for review."
+    if drifts:
+        submitted["recommendations"][0]["tools_affected"] = ["unselected-tool"]
+    expected = EnablementPlan.model_validate(submitted)
+    assert plan_drifts_from_tools(expected, capabilities, role) is drifts
+    # Both replacement and padding would alter this model-authored plan.
+    assert apply_tool_grounding(expected, capabilities, role) != expected
+
+    tracker = _Tracker()
+    judge = _Judge()
+    monkeypatch.setattr(
+        "ui.api.live_runner._resolve_ld_tracking",
+        lambda *_args, **_kwargs: _LDTrackingState(
+            tracker=tracker,
+            ai_client=_AIClient(judge),
+            context={"kind": "request"},
+            model=None,
+            system_prompt=None,
+            params={},
+            judges=[("blueprint-fixes-friction-constraints", 1.0)],
+            config_key="agent-architect-config",
+            variation_name="test",
+        ),
+    )
+    client = _Client(
+        [
+            _Response(
+                [
+                    ToolUseBlock(
+                        id="toolu_plan",
+                        name="submit_enablement_plan",
+                        input=submitted,
+                        type="tool_use",
+                    )
+                ]
+            )
+        ]
+    )
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setattr("ui.api.live_runner.AsyncAnthropic", lambda: client)
+
+    returned = await run_live_plan(tools, role, user)
+
+    assert len(judge.calls) == 1
+    assert json.loads(judge.calls[0][1]) == expected.model_dump(mode="json")
+    assert returned == expected
+    assert len(tracker.judge_results) == 1
