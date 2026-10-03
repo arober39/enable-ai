@@ -17,8 +17,6 @@ The product vision, factory milestones, and build-in-public program live in `@./
 ## Build and run
 
 - `make install` — create `.venv` and install pinned deps
-- `make setup` — provision LaunchDarkly AI Configs (no-op in demo mode)
 - `make test` — run deterministic tests (no LLM calls)
 - `make test-live` — include `@pytest.mark.live` tests (requires `ANTHROPIC_API_KEY`)
-- `make replay-traffic VARIATION=<name>` — drive synthetic traffic through the support orchestrator
 - `make lint` / `make typecheck` — code health

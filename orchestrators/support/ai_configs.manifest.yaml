@@ -1,6 +1,6 @@
-# AI Config manifest consumed by scripts/setup_ai_configs.py.
-# Pinned for the multi-signal guardrails tutorial — do not change the config
-# name, variation names, model, or mode without updating the tutorial.
+# AI Config manifest for the support orchestrator: the config, variations,
+# judge, and metrics it expects to find in LaunchDarkly. Create them by hand
+# or with the LaunchDarkly MCP server.
 
 ai_config:
   name: support-orchestrator-config

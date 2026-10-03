@@ -97,7 +97,6 @@ enable-ai/
 ├── tools/                    # Knowledge base of SaaS tools and their AI capabilities
 ├── mcp_registry/             # Catalog of known MCP servers per tool
 ├── data/                     # Synthetic Serenia data
-├── scripts/                  # Setup and traffic scripts
 ├── tests/
 ├── .claude/                  # Claude Code configuration, rules, and skills
 └── SERENIA.md                # The fictional company's world bible

@@ -20,7 +20,7 @@ A generated orchestrator follows the layout specified in Phase 5.1 of `BUILD_PLA
 - `.env.example` — credentials required (must be a strict subset of root `.env.example`)
 - `Makefile` — `make run` target
 - `README.md` — how to run, what it does
-- `ai_configs.manifest.yaml` — manifest consumed by `scripts/setup_ai_configs.py`
+- `ai_configs.manifest.yaml` — declares the AI Config, variations, judge, and metrics this orchestrator expects in LaunchDarkly
 
 ## Behavioral contract
 

@@ -1,34 +1,18 @@
-.PHONY: install setup setup-ai-configs setup-metrics test test-live replay-traffic lint typecheck clean ui ui-backend ui-frontend ui-install ui-test-smoke
+.PHONY: install test test-live lint typecheck clean ui ui-backend ui-frontend ui-install ui-test-smoke
 
 PYTHON ?= .venv/bin/python
 PIP ?= .venv/bin/pip
-VARIATION ?=
 
 install:
 	python3 -m venv .venv
 	$(PIP) install --upgrade pip
 	$(PIP) install -e ".[dev]"
 
-setup-ai-configs:
-	$(PYTHON) scripts/setup_ai_configs.py
-
-setup-metrics:
-	$(PYTHON) scripts/setup_metrics.py
-
-setup: setup-ai-configs setup-metrics
-
 test:
 	$(PYTHON) -m pytest -m "not live"
 
 test-live:
 	$(PYTHON) -m pytest
-
-replay-traffic:
-	@if [ -z "$(VARIATION)" ]; then \
-		echo "Usage: make replay-traffic VARIATION=<variation-name>"; \
-		exit 1; \
-	fi
-	$(PYTHON) scripts/replay_traffic.py --variation $(VARIATION)
 
 lint:
 	$(PYTHON) -m ruff check .
