@@ -45,6 +45,7 @@ _BYTE_FOR_BYTE: list[tuple[str, str]] = [
     ("prompts/v1_baseline.md.tmpl", "prompts/v1_baseline.md"),
     ("prompts/v2_detailed_responses.md.tmpl", "prompts/v2_detailed_responses.md"),
     ("judges/factual_accuracy.md.tmpl", "judges/factual_accuracy.md"),
+    ("judges/response_conciseness.md.tmpl", "judges/response_conciseness.md"),
     ("ai_configs.manifest.yaml.tmpl", "ai_configs.manifest.yaml"),
     ("Makefile.tmpl", "Makefile"),
     ("orchestrator.py.tmpl", "orchestrator.py"),
