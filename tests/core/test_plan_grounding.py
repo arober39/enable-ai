@@ -269,7 +269,9 @@ def test_travel_plan_skips_idea_generation(isolated_state: Path) -> None:
 
 def test_live_prompt_is_conditioned_on_selected_tool_ids() -> None:
     role = load_role("devrel")
-    message = _build_user_message(["navan", "gmail"], "sess-1", role, _user())
+    message = _build_user_message(
+        ["navan", "gmail"], "sess-1", role, _user(), friction="", tasks=None
+    )
     system = _build_system_prompt(role)
     assert "navan" in message
     assert "gmail" in message

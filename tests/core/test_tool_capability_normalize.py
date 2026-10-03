@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
-from core.identity import local_user
+from core.identity import UserContext, local_user
 from core.tool_catalog import ToolCapability, load_tool
 
 _FEATURES = [
@@ -160,7 +161,15 @@ def test_schema_keeps_native_ai_features_as_an_array() -> None:
     assert tools_exposed["type"] == "array"
 
 
-def test_seed_catalog_lists_are_unchanged() -> None:
+def test_seed_catalog_lists_are_unchanged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Route the user tool cache under tmp_path so a researched Slack entry in
+    # the developer's local agent-state cannot shadow the seed catalog.
+    def _state_path(user: UserContext, *parts: str) -> Path:
+        return tmp_path.joinpath(user.user_id, *parts)
+
+    monkeypatch.setattr("core.tool_catalog.state_path", _state_path)
     capability = load_tool(local_user(), "slack")
     assert capability is not None
     assert [feature.name for feature in capability.native_ai_features] == [

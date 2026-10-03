@@ -513,7 +513,7 @@ def _build_user_message(
         task_lines = "- none provided"
     friction_block = friction_text if friction_text else "None provided."
     return f"""\
-You are Agent Architect, compiling a blueprint for a {role.display_name}.
+You are Agent Architect, compiling a blueprint for the {role.display_name} role.
 
 Your task: produce a structured EnablementPlan for the tools listed below, for a person whose job is {role_lower}. The plan is the blueprint's evidence: what the tools can do together, and what the person would supervise. Call `submit_enablement_plan` exactly once when your work is complete. That call is required even when tool choice is automatic — a text-only reply cannot be turned into a plan.
 
@@ -600,9 +600,9 @@ def _build_system_prompt(role: Role) -> str:
     """
     dk = role.domain_knowledge_text()
     return f"""\
-You are Agent Architect. Compile a blueprint for a {role.display_name.lower()}: the work they actually do, what they should supervise, and which system should build it.
+You are Agent Architect. Compile a blueprint for the {role.display_name} role: the work they actually do, what they should supervise, and which system should build it.
 
-Your job: reason over the tools the user selected and produce a structured EnablementPlan for a {role.display_name.lower()} teammate using those tools.
+Your job: reason over the tools the user selected and produce a structured EnablementPlan for a teammate in the {role.display_name} role using those tools.
 
 You output the plan by calling the `submit_enablement_plan` tool exactly once when the plan is ready. That call is required even if tool choice is left on automatic — a prose-only reply is a failed run. You do not produce free-text reports. You do not call external APIs. You do not invent tools the user didn't include.
 

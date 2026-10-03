@@ -41,7 +41,7 @@ def test_coverage_without_key_is_heuristic() -> None:
 def test_coverage_uses_jev_when_confident(monkeypatch: pytest.MonkeyPatch) -> None:
     def _client() -> httpx.Client:
         def handler(request: httpx.Request) -> httpx.Response:
-            assert request.url.path.endswith("/v1/decide")
+            assert request.url.path.endswith("/v1/systemone")
             return httpx.Response(
                 200,
                 json={
