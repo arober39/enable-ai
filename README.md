@@ -1,100 +1,103 @@
 # Enable AI
 
-Enable AI is an agent system that takes a department's tool stack as input and produces an AI enablement plan for that department — then implements it. Each department's plan recommends which existing tools have AI worth using, which gaps to fill with custom AI, which tools to consolidate, and how to orchestrate the resulting stack behind a single Operations Agent that the team can interact with as a unified surface.
+Enable AI is a diagnosis-first AI enablement platform. It audits a team's actual tool stack, tells them where AI fits, builds the chosen recommendation on a runtime they can trust, and measures whether it paid off. The loop is Diagnose, Recommend, Execute, Measure.
 
-This repo is the reference implementation. It operates on **Serenia & Co.**, a fictional events and venues business, and walks through how an AI enablement system would actually work department by department.
+The repo operates on **Serenia & Co.**, a fictional events and venues business, so every demo runs on synthetic data with zero real-customer risk. See [`SERENIA.md`](./SERENIA.md) for the world bible.
 
-It also serves as the demo asset for LaunchDarkly's [tutorials series](https://launchdarkly.com/docs/tutorials) on operating AI agents in production. Each tutorial lives on its own branch, demonstrating a specific operational concern — multi-signal guardrails, threshold calibration, fail-safe rollout design — against a subagent that Enable AI has already generated.
+## What the app does
 
-## Why this exists
+The main surface is **Agent Architect**, a UI for deciding what agent to build and how a person would supervise it. One run walks seven steps:
 
-Every team building production AI agents eventually needs the same set of capabilities: rollout safety, observability, evaluation, guardrails, fallback behavior, cost controls. Most teams build these incrementally, function by function, and the architecture drifts as they go.
+1. **Work intelligence.** Pick a role. Seeded roles ship in the repo, and any other role can be researched at runtime from its title. The app lists the tasks that role usually does and lets the person confirm the ones they actually do or add their own.
+2. **Tools and friction.** Pick the tools the person uses, from the seeded catalog or researched by name, and describe the friction in their week in plain text.
+3. **Run Agent Architect.** The agent reads the role, tools, tasks, and friction and compiles a plan grounded in what the selected tools can do together.
+4. **Agent Blueprint.** Each task is classified as automate, assist, agentic, or human, with the signals behind the call, the human-in-the-loop shape, and the supervision shift. The blueprint names what the agent would own, what the person keeps, and which build targets fit. The targets are OpenAI Agents SDK, Claude, LangGraph, n8n, Copilot Studio, Zapier, and a custom MCP server, and the blueprint marks which ones it recommends for this role and stack, with a reason for each.
+5. **Pick one recommendation.** The plan's recommendations come in four kinds, use a native AI feature already paid for, augment with custom AI, consolidate overlapping tools, or orchestrate a cross-tool workflow. The person picks one or writes their own. The rest are saved for later.
+6. **Ask Jev to place it.** Jev, TypeSafe's typed decision model, decides whether the blueprint belongs on a new bot or an existing one. Without a key, a local heuristic answers and is labeled as such.
+7. **Build from the Agent Blueprint.** The app writes a copyable workflow prompt from the blueprint and the chosen recommendation. You paste it wherever you want to create the agent, whether that is Grok Bot, one of the build targets from step 4, or any other agent builder. The app never creates or edits agents itself. An optional webhook can also receive the same text.
 
-Enable AI demonstrates the alternative: a coordinator-orchestrated system that knows what AI-enabled looks like in each department and generates the runtime infrastructure to support it, with LaunchDarkly as the control layer for everything that happens after the system ships.
+Orchestration recommendations can also be built and run inside the app. They become validated workflow JSON executed by a fixed interpreter, and each run is recorded as an outcome with its status, duration, and per-step trace. LLM output never executes as code.
 
-## What's in v1
+The original CLI path is still available. A Coordinator agent routes a request such as "Enable AI for customer support" to a role-specific enablement agent that produces a plan and, on request, generates a runnable orchestrator under `orchestrators/`.
 
-The first release contains:
+## Modes
 
-- The **Coordinator** — routes inbound enablement requests to specialized subagents
-- The **Support Enablement Agent** — Enable AI's first department specialist; reads Serenia's support stack, produces an enablement plan, generates the support orchestrator
-- The **Support Orchestrator** — the deployed AI agent that handles customer inquiries at Serenia, integrating Intercom, Zendesk, Slack, and HubSpot
-- The shared infrastructure: hooks, schemas, tool and MCP registries, observability scaffolding, the `.claude/` configuration
+Enable AI runs in demo mode by default. Demo mode makes no external calls, returns catalog-driven synthetic plans, and swaps every tool adapter for a stub that returns the same shape as the real API and tags itself as a stub. You can clone the repo and run everything end to end without accounts for any integrated tool.
 
-Future releases extend Enable AI to additional departments — Marketing, Engineering, Legal, Finance, HR, Sales — each through the same coordinator-and-subagent pattern.
+Live mode calls Anthropic directly. Set `ENABLE_AI_DEMO_MODE=false` and `ANTHROPIC_API_KEY`. The planner defaults to Claude Opus 5.5 and can be overridden with `ENABLEMENT_AGENT_MODEL`.
 
-## Getting started
+## LaunchDarkly integration
+
+When `LAUNCHDARKLY_SDK_KEY` is set in live mode, Agent Architect fetches its model and any system prompt from a completion-mode AgentControl config named `agent-architect-config`, or the key set in `AGENT_ARCHITECT_AI_CONFIG_KEY`. Each run is wrapped in the AI SDK tracker, so duration, token counts, and success land in LaunchDarkly as metrics. Any judges attached to the served variation are run against the plan the agent produced, and their scores are recorded. Judge evaluation requires the provider packages:
+
+```bash
+.venv/bin/pip install launchdarkly-server-sdk-ai-langchain==0.8.0 langchain-anthropic==1.5.1
+```
+
+Keep the project's `anthropic==0.101.0` pin. If the SDK key or the provider packages are missing, the app still returns a plan and logs that tracking or judging was skipped.
+
+Workflow runs also emit `enablement.workflow_run` and `enablement.workflow_error` events when the SDK key is present.
+
+## Run it
+
+Install Python dependencies, then the UI:
 
 ```bash
 git clone https://github.com/[org]/enable-ai
 cd enable-ai
 make install
+make ui-install
 ```
 
-Set the one required env var:
+Copy the env file and set what you need. Everything is optional in demo mode.
 
 ```bash
 cp .env.example .env
-# Set ANTHROPIC_API_KEY (or OPENAI_API_KEY)
 ```
 
-Run the coordinator against Serenia's support stack:
+Start the two halves of the UI in separate terminals and open `http://localhost:3000`:
+
+```bash
+make ui-backend     # FastAPI on :8000
+make ui-frontend    # Next.js on :3000
+```
+
+Run the CLI path:
 
 ```bash
 python -m coordinator "Enable AI for customer support"
 ```
 
-The Coordinator delegates to the Support Enablement Agent, which produces a structured enablement plan and generates a runnable support orchestrator under `orchestrators/support/`.
+Other targets:
 
-## Demo mode and credentials
+```bash
+make test           # deterministic suite, no LLM calls
+make test-live      # adds tests that call Anthropic (needs ANTHROPIC_API_KEY)
+make ui-test-smoke  # Playwright smoke tests in demo mode
+make lint
+make typecheck
+```
 
-Enable AI runs against realistic stubs by default. The generated orchestrators integrate with real SaaS tools (Intercom, Zendesk, Slack, HubSpot, and so on for future departments), but if the corresponding API credentials aren't set, the integrations fall back to stub implementations that return synthetic responses with the same shape as the real APIs.
+UI setup details, including the LaunchDarkly steps, are in [`ui/README.md`](./ui/README.md).
 
-This means you can clone the repo, run everything end-to-end, and see realistic behavior without needing accounts for the tools Enable AI integrates with. When you want real interaction, set the relevant env vars and the same code paths use the real APIs.
+## Credentials
 
-All credentials are environment variables. The repo never reads from anywhere else. See `.env.example` for the full list.
-
-## The tutorial series
-
-Each LaunchDarkly tutorial that uses Enable AI lives on its own branch:
-
-| Branch | Tutorial |
-|---|---|
-| `tutorial-01-multi-signal-guardrails` | Building multi-signal guardrails for self-healing AI systems |
-| `tutorial-02-threshold-calibration` *(planned)* | Calibrating guarded rollout thresholds against historical traffic |
-| `tutorial-03-fail-safely` *(planned)* | Designing AI Config rollouts that fail safely |
-
-Each branch represents the repo's state at the *start* of the tutorial — the orchestrator built, the AI Config provisioned, the metrics ready to attach. Cloning the branch puts you exactly where the tutorial begins. The tutorial's specific code lives in `tutorials/<tutorial-name>/`.
-
-The `main` branch always holds the most recent state, which incorporates all completed tutorials.
-
-## Architecture
-
-Enable AI follows a hub-and-spoke pattern. One Coordinator agent receives all inbound requests and routes them to specialized Enablement Subagents (Support is the only one in v1). Subagents have isolated context — they don't inherit the Coordinator's conversation history, and they only communicate back through structured outputs the Coordinator aggregates.
-
-A few patterns hold throughout:
-
-- **Hooks for deterministic enforcement.** Critical rules — credential scope, write boundaries, demo-mode safety — are implemented as `PreToolUse` and `PostToolUse` hooks. Prompts give probabilistic compliance; hooks give guarantees.
-- **Structured outputs everywhere.** Every plan, recommendation, and orchestrator artifact is a Pydantic model with a JSON Schema attached to the agent's `tool_use`. No free-text outputs for structured data.
-- **MCP-first integration.** Generated orchestrators use existing MCP servers when they exist (official or community), build minimal custom MCP servers only when no usable one is available, and fall back to direct API integration only when MCP isn't viable.
-- **Scoped tools.** Each subagent receives only the tools it needs for its function. The Support Enablement Agent doesn't have legal-document tools, and vice versa.
-- **Scratchpad files for long-running state.** Subagent investigations that span multiple steps persist findings to `agent-state/<agent>-scratchpad.md` so context isn't lost between turns.
-
-The `.claude/` directory documents these conventions in detail. Path-scoped rules in `.claude/rules/` apply only when Claude is editing the relevant code paths.
+All credentials are environment variables, and `.env.example` is the single source of truth for their names. The repo never reads credentials from anywhere else. Tool credentials for generated orchestrators, Jev, the Grok Bot gateway, and the handoff webhook are each optional, and the corresponding feature degrades to a stub or a labeled fallback when they are unset.
 
 ## Repository layout
 
 ```
 enable-ai/
-├── coordinator/              # The Coordinator agent and its hooks
-├── enablement_agents/        # Department specialists (Support in v1)
-├── orchestrators/            # Generated orchestrators (one per enabled department)
-├── stacks/                   # Each department's declared tool stack
+├── core/                     # Agent Architect, roles, tool catalog, credentials, outcomes, Jev, Grok Bot handoff
+├── ui/                       # FastAPI backend (api/) and Next.js frontend (web/)
+├── coordinator/              # The Coordinator agent and its hooks (CLI path)
+├── enablement_agents/        # Role agents, domain knowledge, generator pipelines, workflow interpreter
+├── orchestrators/            # Generated orchestrators
+├── stacks/                   # Declared tool stacks per role
 ├── tools/                    # Knowledge base of SaaS tools and their AI capabilities
 ├── mcp_registry/             # Catalog of known MCP servers per tool
-├── data/                     # Synthetic data per department (customers, tickets, etc.)
-├── scripts/                  # Setup, replay, and operational scripts
-├── tutorials/                # Tutorial-specific code (populated by tutorial branches)
+├── data/                     # Synthetic Serenia data
+├── scripts/                  # Setup and traffic scripts
 ├── tests/
 ├── .claude/                  # Claude Code configuration, rules, and skills
 └── SERENIA.md                # The fictional company's world bible
@@ -102,10 +105,4 @@ enable-ai/
 
 ## Serenia & Co.
 
-Serenia & Co. is a mid-sized events and venues company. They host weddings, corporate offsites, conferences, and private parties at three venues. They have departments you'd expect at a business that size: sales, customer support, vendor operations, HR, finance, legal, marketing, and a small engineering team that runs their booking platform.
-
-For the full fictional-company context — org chart, named personas, brand voice — see [`SERENIA.md`](./SERENIA.md).
-
-## Contributing
-
-Enable AI is the demo asset for LaunchDarkly's tutorial series; structural changes happen through tutorial branches. If you're following a tutorial and find an issue with the code, please open an issue against the relevant branch.
+Serenia & Co. is a mid-sized events and venues company. They host weddings, corporate offsites, conferences, and private parties at three venues and have the departments you'd expect at that size, including sales, customer support, vendor operations, HR, finance, legal, marketing, and a small engineering team that runs their booking platform. The org chart, named personas, recurring scenarios, and brand voice are in [`SERENIA.md`](./SERENIA.md).

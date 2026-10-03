@@ -7,7 +7,7 @@ The app is two tiers:
 - **Backend** (`ui/api/`): FastAPI hosting the agent. Returns the catalog and runs `produce_plan`.
 - **Frontend** (`ui/web/`): Next.js 15 + TypeScript + Tailwind. Picks tools, renders the plan.
 
-This is **scope expansion beyond `BUILD_PLAN.md`** — the v1 plan put the Next.js frontend out-of-scope. Treat the UI as a development convenience, not part of the v1 deliverable. The tests in `tests/` cover the v1 contract; this UI is for human-in-the-loop testing.
+In live mode the backend can run behind a LaunchDarkly AgentControl config, record generation metrics, and score each blueprint with attached judges. The setup for that is below.
 
 ## Prerequisites
 
@@ -67,7 +67,7 @@ The backend honors the same `ENABLE_AI_DEMO_MODE` env var as the rest of the sys
 | **Demo** (default) | `ENABLE_AI_DEMO_MODE=true` *or* `ANTHROPIC_API_KEY` unset | The backend returns a synthetic catalog-driven plan. No LLM cost. The UI labels the plan `demo mode`. Useful for testing the surface itself. |
 | **Live** | `ENABLE_AI_DEMO_MODE=false` AND `ANTHROPIC_API_KEY` set | The backend calls Anthropic's API directly via `anthropic.AsyncAnthropic()`, using Pydantic-generated JSON Schema as a `tool_use` input schema. When `LAUNCHDARKLY_SDK_KEY` is also set, it fetches completion-mode AI Config `agent-architect-config` (or `AGENT_ARCHITECT_AI_CONFIG_KEY`) and records generation metrics through the LaunchDarkly AI SDK tracker so attached online judges can score outputs. |
 
-### LaunchDarkly online eval setup (for filming)
+### LaunchDarkly online eval setup
 
 Use this when you want Monitoring rows from real Architect runs:
 
@@ -81,9 +81,10 @@ Use this when you want Monitoring rows from real Architect runs:
    - `LAUNCHDARKLY_SDK_KEY=...`
 2. In LaunchDarkly, create/use completion-mode AgentControl config key:
    - `agent-architect-config` (or set `AGENT_ARCHITECT_AI_CONFIG_KEY` to your override)
-3. Attach judge **`blueprint-fixes-friction-constraints`** to that config variation and set sampling to **100%** for demos.
-4. Run the UI flow (role + tools + friction → Run). A few live runs should appear in Monitoring within a couple of minutes.
-   - The friction field now accepts up to 8000 characters for longer real-world context.
+3. Create a custom judge in LaunchDarkly and attach it to the config variation. Any judge works; `blueprint-fixes-friction-constraints` is the one used so far. Set sampling to **100%** for demos.
+4. Run the UI flow (role + tools + friction → Run). A few live runs should appear in Monitoring within a couple of minutes. Judge scores lag the call by a minute or two.
+   - The friction field accepts up to 8000 characters for longer real-world context.
+5. To add a challenger model, create a second variation on the same config with a different model, attach the same judge, and change the default rule under a guarded rollout with the judge metric as a regression metric. The backend takes the model from whichever variation is served; nothing in the repo changes.
 
 If `LAUNCHDARKLY_SDK_KEY` is missing, live mode still returns a blueprint and logs that eval tracking was skipped.
 If judge provider packages are missing, the run still returns a blueprint and logs a warning that judge evaluation was skipped.
@@ -96,10 +97,10 @@ The rest of the system uses `claude-agent-sdk==0.1.81` for agent execution. The 
 
 What still uses claude-agent-sdk:
 - The CLI: `python -m coordinator "..."`
-- Phase 7 live tests (`@pytest.mark.live`)
-- The Coordinator's `run_coordinator` and the Support agent's `produce_plan`
+- Live tests (`@pytest.mark.live`)
+- The Coordinator's `run_coordinator` and the role agents' `produce_plan`
 
-If you debug the SDK bundled-CLI issue, the UI's live path can be swapped back to the routed Coordinator/Support flow with a one-import change in `ui/api/server.py`. The deviation is scoped — it only affects the UI demo path.
+If you debug the SDK bundled-CLI issue, the UI's live path can be swapped back to the routed Coordinator flow with a one-import change in `ui/api/server.py`. The deviation is scoped — it only affects the UI path.
 
 Set vars before launching the backend:
 
@@ -153,15 +154,17 @@ What it does **not** cover:
 ```
 ┌─────────────────────────┐         ┌───────────────────────────────┐
 │ Next.js dev (port 3000) │  HTTP   │ FastAPI backend (port 8000)   │
-│ ├ ToolSelector          │ ──────→ │ ├ GET  /api/tools             │
-│ └ PlanDisplay           │         │ ├ POST /api/enablement        │
-└─────────────────────────┘         │ └ Calls SupportEnablementAgent│
-                                    └─────────────┬─────────────────┘
-                                                  │
-                                                  ▼
+│ ├ RolePicker            │ ──────→ │ ├ GET  /api/tools, /api/roles │
+│ ├ ToolPicker            │         │ ├ POST /api/enablement        │
+│ ├ WorkIntelligence      │         │ └ ui/api/live_runner.py       │
+│ ├ AgentBlueprintView    │         └─────────────┬─────────────────┘
+│ └ GrokbotHandoff        │                       │
+└─────────────────────────┘                       ▼
                                     ┌─────────────────────────────┐
                                     │ Agent Architect             │
                                     │ (blueprint, demo or live)   │
+                                    │ live: AgentControl config,  │
+                                    │ AI SDK tracker, judges      │
                                     └─────────────────────────────┘
 ```
 
@@ -175,7 +178,10 @@ ui/
 ├── api/
 │   ├── __init__.py
 │   ├── server.py                      # FastAPI app + routes
-│   └── synthetic.py                   # demo-mode plan builder
+│   ├── live_runner.py                 # live mode: Anthropic call, AgentControl config, tracker, judges
+│   ├── synthetic.py                   # demo-mode plan builder
+│   ├── jobs.py
+│   └── speech.py
 └── web/
     ├── package.json
     ├── tsconfig.json
@@ -183,16 +189,13 @@ ui/
     ├── tailwind.config.ts
     ├── postcss.config.js
     ├── playwright.config.ts           # e2e config (boots both servers)
-    ├── e2e/
-    │   └── smoke.spec.ts              # Playwright smoke tests
+    ├── e2e/                           # Playwright smoke, selection-step, handoff-submit specs
     └── app/
         ├── layout.tsx
-        ├── page.tsx                   # main UI page
+        ├── page.tsx                   # the seven-step flow
+        ├── settings/page.tsx
         ├── globals.css
-        ├── components/
-        │   ├── ToolSelector.tsx
-        │   └── PlanDisplay.tsx
-        └── lib/
-            ├── api.ts
-            └── types.ts
+        ├── components/                # RolePicker, ToolPicker, WorkIntelligence, PlanDisplay,
+        │                              # AgentBlueprintView, BuildOrchestrator, GrokbotHandoff, ...
+        └── lib/                       # api.ts, types.ts, homeSession.ts, ...
 ```
