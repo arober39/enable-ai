@@ -69,8 +69,9 @@ _ARCHITECT_AI_CONFIG_KEY_ENV = "AGENT_ARCHITECT_AI_CONFIG_KEY"
 _DEFAULT_ARCHITECT_AI_CONFIG_KEY = "agent-architect-config"
 _SUBMIT_TOOL_NAME = "submit_enablement_plan"
 
-#: Ceiling for models that do not spend output tokens on adaptive thinking.
-_MAX_TOKENS = 4096
+#: Ceiling for models other than Opus 5.5. 4096 truncated a full plan
+#: before the required metadata block. 16384 matches the Opus first-call cap.
+_MAX_TOKENS = 16384
 
 #: Opus 5.5 always thinks, and ``max_tokens`` covers thinking plus the
 #: tool-call JSON. 4096 fit a plan when the model ran without thinking;
