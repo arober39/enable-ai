@@ -253,7 +253,7 @@ async def test_sonnet_override_keeps_forced_tool(
     call = client.messages.calls[0]
     assert call["model"] == "claude-sonnet-4-6"
     assert call["tool_choice"] == {"type": "tool", "name": "submit_enablement_plan"}
-    assert call["max_tokens"] == 4096
+    assert call["max_tokens"] == 16384
     assert "output_config" not in call
     _assert_no_sampling(call)
     assert "strict" not in call["tools"][0]
